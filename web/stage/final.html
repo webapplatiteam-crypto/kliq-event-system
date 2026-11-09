@@ -106,7 +106,7 @@
   const { $, rpc, msg, esc, STAFF, toast, seriesImg, inkFor } = K;
   const me = await STAFF.guard(['mc']);
   if (!me) return;
-  let draw = null, prizes = [], claimSec = 60, working = false, timer = null;
+  let draw = null, prizes = [], claimSec = 60, working = false, timer = null, justSpun = false;   // justSpun: ป๊อปอัปเปิดต่อจากวงล้อในเครื่องนี้ → เริ่มนับ 30 วิเต็มตอนป๊อปอัปขึ้น
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const prizeOf = r => prizes.find(p => p.rank === r) || {};
   const prizeName = r => prizeOf(r).name || ('รางวัลที่ ' + r);
@@ -217,7 +217,7 @@
       </div>`;
     Wheel.canvas = $('#wheel'); Wheel.rot = 0; Wheel.build(draw.pool_tickets || []);
     go.textContent = draw.done ? 'ประกาศผลครบแล้ว' : ph === 'reveal' ? `เปิดการ์ดรางวัลที่ ${r}` : `หมุนวงล้อ · รางวัลที่ ${r} · การ์ด ${card.name}`; go.disabled = draw.done;
-    if (draw.pending) openModal(draw.pending);
+    if (draw.pending) { openModal(draw.pending, justSpun); justSpun = false; }
   }
 
   function cardsHTML(series, mini) {
@@ -229,10 +229,12 @@
   }
 
   // ---------- ป๊อปอัปผู้โชคดี + นับถอยหลัง ----------
-  function openModal(pd) {
+  const WHEEL_MS = 7400;   // เวลาหมุนวงล้อ ใช้ชดเชยเมื่อรีเฟรชหน้าแล้วกลับมาที่ป๊อปอัปเดิม
+  function openModal(pd, fresh) {
     clearInterval(timer);
     const m = $('#modal'); m.hidden = false;
-    const total = claimSec, startAt = pd.at ? new Date(pd.at).getTime() : Date.now();
+    // นับถอยหลังเริ่มตอนป๊อปอัปขึ้น (หลังวงล้อหยุด) ไม่ใช่ตอนกดหมุน · ถ้ารีเฟรชกลับมา ใช้เวลาเซิร์ฟเวอร์ + เวลาหมุน
+    const total = claimSec, startAt = fresh || !pd.at ? Date.now() : Math.min(Date.now(), new Date(pd.at).getTime() + WHEEL_MS);
     const C = Math.round(2 * Math.PI * 54);
     const winName = (draw.series.find(s => s.code === pd.card) || {}).name || '';
     m.innerHTML = `<div class="modal"><div class="mbox">
@@ -321,7 +323,7 @@
     if (next.pending && !prev.pending) {                     // หมุนวงล้อ
       const pd = next.pending; setHead(`รางวัลที่ ${pd.rank} · ${prizeName(pd.rank)} · วงล้อกำลังหมุน…`, true);
       const lad = document.querySelector(`.lad[data-rank="${pd.rank}"] .st`); if (lad) lad.textContent = 'กำลังหมุน…';
-      await Wheel.spin(pd.ticket_no); ding(); confetti(90);
+      await Wheel.spin(pd.ticket_no); ding(); confetti(90); justSpun = true;
       setHead(`${pd.ticket_no} · กรุณาขึ้นเวที`); await sleep(600);
     }
   }
