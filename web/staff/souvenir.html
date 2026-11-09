@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>จุดรับของที่ระลึก | KLIQ Staff</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+<style>
+  .sbox { display:grid; grid-template-columns: repeat(6, 1fr); gap:6px }
+  .sbox span { height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; background:#EEEBE5; color:#7A766F }
+  .sbox span.on { background:#121212; color:#C9A063 }
+  .cam { border-radius:16px; overflow:hidden; background:#000; aspect-ratio: 4/3; position:relative }
+  .cam video { width:100%; height:100%; object-fit:cover; display:block }
+  .tier { border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:2px; border:1px solid }
+  .tier .tl { font-size:13px; letter-spacing:.5px } .tier b { font-size:20px; font-weight:500 }
+  .tier.prem { background:linear-gradient(135deg,#C9A063,#E6C78A); color:#121212; border-color:#B88C4A }
+  .tier.basic { background:#EEEBE5; color:#3A3632; border-color:#D9D3C8 }
+</style>
+</head>
+<body class="light">
+<main style="max-width:520px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px">
+  <div class="head">
+    <div><div style="font-size:12px;letter-spacing:3px;color:#8A6A3C">KLIQ STAFF</div><h1 style="font-size:22px">จุดรับของที่ระลึก</h1></div>
+    <div style="display:flex;gap:8px;align-items:center"><span class="pill wait" id="stock">คงเหลือ –</span><button class="lbtn" id="out" style="min-height:40px">ออก</button></div>
+  </div>
+  <div class="row" style="align-items:stretch">
+    <button class="lbtn primary" id="camBtn" style="flex:1 1 160px;min-height:52px">สแกน QR ลูกค้า</button>
+    <form id="sf" style="flex:1 1 200px;display:flex;gap:6px">
+      <label class="sr-only" for="q">ค้นหาด้วยเบอร์ รหัส PP หรือเลขลุ้นโชค</label>
+      <input class="linput" id="q" placeholder="เบอร์ / PP-0001 / I-001" style="min-height:52px">
+      <button class="lbtn" style="min-height:52px">ค้นหา</button>
+    </form>
+  </div>
+  <div class="cam" id="cam" hidden><video id="v" playsinline muted></video></div>
+  <div id="result"></div>
+  <p class="sub" id="foot" style="text-align:center;margin:0"></p>
+</main>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+<script src="/vendor/jsQR.js"></script>
+<script>
+(async function () {
+  const { $, rpc, msg, esc, fmtTime, STAFF, toast, busy, startScanner } = K;
+  const me = await STAFF.guard(['souvenir']);
+  if (!me) return;
+  $('#out').onclick = () => STAFF.logout();
+  $('#foot').textContent = 'เข้าสู่ระบบเป็น ' + me.name + ' (' + me.code + ')';
+  let scanner = null, lastCode = '', lastAt = 0;
+
+  async function lookup(q) {
+    $('#result').innerHTML = '<div class="lcard">กำลังค้นหา…</div>';
+    const r = await rpc('souvenir_lookup', { p_token: me.token, p_query: q });
+    if (r && r.code === 'AUTH') { STAFF.logout(); return; }
+    if (!r || !r.ok) { $('#result').innerHTML = `<div class="lnotice">${esc(msg(r))}</div>`; return; }
+    show(r);
+  }
+
+  function show(r) {
+    const p = r.participant, st = r.stamps, done = st.filter(s => s.done).length;
+    $('#stock').textContent = 'มอบแล้ว ' + (r.given_basic + r.given_premium) + ' · พิเศษ ' + r.given_premium + ' · ทั่วไป ' + r.given_basic;
+    const prem = r.tier_now === 'premium', tierName = n => n === 'premium' ? r.premium_name : r.basic_name;
+    // ป้ายใหญ่บอกทันทีว่าได้ของแบบไหน
+    let status = `<div class="tier ${prem ? 'prem' : 'basic'}"><span class="tl">${prem ? 'เล่นครบทุกฐาน' : done ? 'เล่นไม่ครบ (' + done + '/' + st.length + ' ฐาน)' : 'ไม่ได้เล่นกิจกรรม'}</span><b>${esc(r.tier_name)}</b></div>`, action = '';
+    if (p.souvenir_at && !r.upgrade) status += `<div class="lnotice">รับ${esc(tierName(p.souvenir_tier))}ไปแล้วเมื่อ ${fmtTime(p.souvenir_upgraded_at || p.souvenir_at)}${r.souvenir_by ? ' โดย ' + esc(r.souvenir_by) : ''} · ห้ามมอบซ้ำ</div>`;
+    else if (r.upgrade) { status += `<div class="lnotice">รับ${esc(r.basic_name)}ไปแล้วเมื่อ ${fmtTime(p.souvenir_at)} · ตอนนี้เล่นครบทุกฐานแล้ว มอบ${esc(r.premium_name)}เพิ่มได้</div>`;
+           action = `<button class="lbtn gold" id="give" style="min-height:56px;font-size:17px">มอบ${esc(r.premium_name)} (เพิ่มจากที่รับไปแล้ว)</button>`; }
+    else action = `<button class="lbtn gold" id="give" style="min-height:56px;font-size:17px">ยืนยันมอบ${esc(r.tier_name)}</button>`;
+    $('#result').innerHTML = `<div class="lcard">
+      <div style="display:flex;flex-direction:column"><b style="font-size:22px;font-weight:500">${esc(p.name)}</b>
+      <span class="sub">${esc(p.ref_code)} · ${esc(p.phone_masked)} · ${esc(p.ticket_no)} (${esc(p.series_name)})</span></div>
+      <div class="sbox" role="img" aria-label="ผ่าน ${done} จาก ${st.length} ฐาน">${st.map((s, i) => `<span class="${s.done ? 'on' : ''}" title="${esc(s.name)}">${i + 1}</span>`).join('')}</div>
+      ${status}${action}</div>`;
+    const g = $('#give');
+    if (g) g.onclick = async () => {
+      busy(g, true);
+      const x = await rpc('souvenir_redeem', { p_token: me.token, p_ref: p.ref_code });
+      if (x && x.ok) { toast('มอบ' + tierName(x.tier) + 'ให้ ' + p.name + ' เรียบร้อย', 'ok'); lookup(p.ref_code); }
+      else { toast(msg(x), 'err'); lookup(p.ref_code); }
+    };
+  }
+
+  $('#sf').onsubmit = e => { e.preventDefault(); const q = $('#q').value.trim(); if (q) lookup(q); };
+  $('#camBtn').onclick = async () => {
+    if (scanner) { scanner.stop(); scanner = null; $('#cam').hidden = true; $('#camBtn').textContent = 'สแกน QR ลูกค้า'; return; }
+    $('#cam').hidden = false; $('#camBtn').textContent = 'ปิดกล้อง';
+    scanner = await startScanner($('#v'), text => {
+      const now = Date.now();
+      if (text === lastCode && now - lastAt < 4000) return false;
+      lastCode = text; lastAt = now;
+      if (navigator.vibrate) navigator.vibrate(60);
+      lookup(text);
+      return false;
+    }, () => { toast('เปิดกล้องไม่ได้ กรุณาอนุญาตกล้อง หรือค้นหาด้วยเบอร์แทน', 'err'); $('#cam').hidden = true; scanner = null; $('#camBtn').textContent = 'สแกน QR ลูกค้า'; });
+  };
+})();
+</script>
+</body>
+</html>

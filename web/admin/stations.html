@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ฐานกิจกรรม & QR | KLIQ Admin</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="light">
+<div class="layout">
+  <nav class="side" id="side" aria-label="เมนูแอดมิน"></nav>
+  <main class="main">
+    <div class="head noprint">
+      <div><h1>ฐานกิจกรรม &amp; QR Code</h1><div class="sub">QR ฐานให้เจ้าหน้าที่ถือไว้ ยื่นให้สแกนหลังลูกค้าทำกิจกรรมเสร็จ</div></div>
+      <button class="lbtn primary" onclick="print()">พิมพ์ QR ทั้งหมด</button>
+    </div>
+    <div class="lnotice noprint">ห้ามติด QR ฐานไว้ให้ถ่ายรูปได้ ถ้า QR หลุดออกไป กด "เปลี่ยน QR ใหม่" แล้วพิมพ์ใหม่ QR เดิมจะใช้ไม่ได้ทันที</div>
+    <div class="qrgrid" id="grid"></div>
+  </main>
+</div>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+<script src="/vendor/qrcode.js"></script>
+<script src="/admin/admin.js"></script>
+<script>
+(async function () {
+  const { $, rpc, msg, esc, toast, qrSvg, download } = K;
+  const me = await AdminShell('stations', []);
+  if (!me) return;
+  const origin = location.origin;
+  async function load() {
+    const r = await rpc('admin_stations', { p_token: me.token });
+    if (!r || !r.ok) { $('#grid').innerHTML = `<div class="lnotice">${esc(msg(r))}</div>`; return; }
+    const reg = `<div class="qrcard"><div style="display:flex;justify-content:space-between;align-items:center"><span class="pill wait">REGISTER</span><span class="sub">ติดป้ายได้</span></div>
+      <div class="qr">${qrSvg(origin + '/', 200)}</div>
+      <div style="text-align:center"><b style="font-size:20px;font-weight:500">จุดลงทะเบียน</b><div class="sub">สแกนเพื่อลงทะเบียนลุ้น iPhone</div></div>
+      <button class="lbtn noprint" data-dl="register" data-url="${esc(origin + '/')}">ดาวน์โหลด SVG</button></div>`;
+    $('#grid').innerHTML = reg + r.rows.map((s, i) => {
+      const url = origin + '/s.html?t=' + encodeURIComponent(s.qr_token);
+      return `<div class="qrcard" style="${s.active ? '' : 'opacity:.55'}">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span class="pill done">ฐาน ${i + 1}</span>
+          <span class="sub noprint">${s.active ? '● เปิดใช้งาน' : '○ ปิดอยู่'} · แสตมป์ ${s.count} คน</span></div>
+        <div class="qr">${qrSvg(url, 200)}</div>
+        <div style="text-align:center"><b style="font-size:20px;font-weight:500">${esc(s.name)}</b><div class="sub">สแกนรับแสตมป์ · KLIQ Exhibition Journey</div></div>
+        <div class="noprint" style="display:flex;flex-direction:column;gap:8px">
+          <label class="lfield">ชื่อฐาน<input class="linput" value="${esc(s.name)}" data-name="${s.id}"></label>
+          <div class="row">
+            <button class="lbtn" data-save="${s.id}">บันทึกชื่อ</button>
+            <button class="lbtn" data-toggle="${s.id}" data-active="${s.active}">${s.active ? 'ปิดฐาน' : 'เปิดฐาน'}</button>
+            <button class="lbtn" data-dl="station-${i + 1}" data-url="${esc(url)}">SVG</button>
+            <button class="lbtn danger" data-rotate="${s.id}">เปลี่ยน QR ใหม่</button>
+          </div></div></div>`;
+    }).join('');
+  }
+  $('#grid').onclick = async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.dl) { download('kliq-qr-' + b.dataset.dl + '.svg', qrSvg(b.dataset.url, 800), 'image/svg+xml'); return; }
+    const id = +(b.dataset.save || b.dataset.toggle || b.dataset.rotate);
+    if (!id) return;
+    const nameEl = document.querySelector(`[data-name="${id}"]`);
+    let args = { p_token: me.token, p_id: id, p_name: nameEl.value, p_active: null, p_rotate: false };
+    if (b.dataset.toggle) args.p_active = b.dataset.active !== 'true';
+    if (b.dataset.rotate) { if (!confirm('เปลี่ยน QR ของฐานนี้? QR ที่พิมพ์ไว้แล้วจะใช้ไม่ได้ ต้องพิมพ์ใหม่')) return; args.p_rotate = true; }
+    const r = await rpc('admin_station_save', args);
+    toast(r && r.ok ? 'บันทึกแล้ว' : msg(r), r && r.ok ? 'ok' : 'err');
+    load();
+  };
+  load();
+})();
+</script>
+</body>
+</html>

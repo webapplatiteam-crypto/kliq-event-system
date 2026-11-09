@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<title>ลงทะเบียน | KLIQ Experience</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="dark">
+<main class="app">
+  <div class="topbar"><span class="brand">KLIQ</span><span class="small muted">BY LIGHTING SOLUTION</span></div>
+
+  <section style="display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:6px">
+    <div class="wordmark">KLIQ</div>
+    <div class="tagline">EVERY ROOM SIMPLIFIED</div>
+    <h1 id="eventName" style="font-size:22px;font-weight:400;padding-top:8px;text-align:center">Grand Launch Experience</h1>
+    <p class="center" style="margin:0;color:var(--ink2);line-height:1.6">ลงทะเบียนรับการ์ด KLIQ 1 ใบ ลุ้น iPhone บนเวที<br>เดินชม 6 ฐาน รับของที่ระลึกก่อนกลับ</p>
+  </section>
+
+  <div class="tiles" aria-hidden="true">
+    <figure><img src="/assets/kliq-uno-p.webp" alt=""><figcaption>UNO</figcaption></figure>
+    <figure><img src="/assets/kliq-ikon-p.webp" alt=""><figcaption>IKON</figcaption></figure>
+    <figure><img src="/assets/kliq-forma-p.webp" alt=""><figcaption>FORMA</figcaption></figure>
+    <figure><img src="/assets/kliq-nova-p.webp" alt=""><figcaption>NOVA</figcaption></figure>
+    <figure><img src="/assets/kliq-casa-p.webp" alt=""><figcaption>CASA</figcaption></figure>
+  </div>
+
+  <div id="closed" class="notice err" hidden></div>
+
+  <form id="form" novalidate style="display:flex;flex-direction:column;gap:16px">
+    <div class="seg" role="group" aria-label="ประเภทการลงทะเบียน">
+      <button type="button" id="modePre" aria-pressed="true">ลงทะเบียนล่วงหน้าแล้ว</button>
+      <button type="button" id="modeWalk" aria-pressed="false">Walk-in</button>
+    </div>
+
+    <div class="field">
+      <label for="phone">เบอร์โทรศัพท์</label>
+      <input class="input" id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="08X-XXX-XXXX" required>
+      <span class="small muted" id="phoneHint">ระบบจะดึงข้อมูลที่ลงทะเบียนไว้ให้อัตโนมัติ</span>
+    </div>
+
+    <div id="walkFields" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="field"><label for="name">ชื่อ - นามสกุล *</label><input class="input" id="name" autocomplete="name" placeholder="ชื่อ นามสกุล"></div>
+      <div class="field"><label for="email">อีเมล</label><input class="input" id="email" type="email" autocomplete="email" placeholder="name@email.com"></div>
+      <div class="field"><label for="company">บริษัท / ร้านค้า</label><input class="input" id="company" autocomplete="organization" placeholder="ชื่อบริษัทหรือร้านค้า"></div>
+      <div class="notice small" style="color:var(--ink2)">ระบบจะสุ่มการ์ด KLIQ ให้คุณ 1 ใบ จาก 5 ซีรีส์ หลังกดรับสิทธิ์</div>
+    </div>
+
+    <label class="check"><input type="checkbox" id="consent">
+      <span>ยินยอมให้เก็บชื่อ เบอร์โทร และอีเมล เพื่อใช้ในกิจกรรมนี้และติดต่อผู้ได้รางวัล ตาม<a href="/privacy.html" target="_blank" rel="noopener">นโยบายความเป็นส่วนตัว</a></span></label>
+
+    <div id="err" class="notice err" hidden role="alert"></div>
+    <button class="btn" type="submit" id="submit">สุ่มการ์ดและรับสิทธิ์
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></button>
+    <p class="small muted center" style="margin:0">1 เบอร์ 1 สิทธิ์ · ลงทะเบียนซ้ำด้วยเบอร์เดิมจะกลับเข้าสิทธิ์เดิม</p>
+  </form>
+</main>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+<script>
+(function () {
+  const { $, rpc, msg, busy, P } = K;
+  const next = new URLSearchParams(location.search).get('next');
+  if (P.token() && !new URLSearchParams(location.search).has('new')) { location.replace(next || '/passport.html'); return; }
+
+  let walkin = false;
+
+  function setMode(w) {
+    walkin = w;
+    $('#modePre').setAttribute('aria-pressed', !w); $('#modeWalk').setAttribute('aria-pressed', w);
+    $('#walkFields').hidden = !w;
+    $('#walkFields').style.display = w ? 'flex' : 'none';
+    $('#phoneHint').textContent = w ? 'ใช้สำหรับติดต่อหากได้รับรางวัล' : 'ระบบจะดึงข้อมูลที่ลงทะเบียนไว้ให้อัตโนมัติ';
+    $('#err').hidden = true;
+  }
+  $('#modePre').onclick = () => setMode(false);
+  $('#modeWalk').onclick = () => setMode(true);
+  setMode(new URLSearchParams(location.search).get('mode') === 'walkin');
+
+  rpc('event_info', {}).then(r => {
+    if (!r || r.ok === false) return;
+    if (r.event_name) $('#eventName').textContent = r.event_name.replace(/^KLIQ\s*/, '');
+    if (!r.registration_open) {
+      $('#closed').hidden = false;
+      $('#closed').textContent = 'ปิดรับลงทะเบียนลุ้นโชคแล้ว ผู้ที่ลงทะเบียนไว้แล้วกรอกเบอร์เดิมเพื่อเข้าดู Passport ได้';
+    }
+  });
+
+  $('#form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = $('#submit');
+    $('#err').hidden = true;
+    busy(btn, true, 'กำลังลงทะเบียน…');
+    const r = await rpc('register_participant', {
+      p_phone: $('#phone').value, p_walkin: walkin, p_name: $('#name').value, p_email: $('#email').value,
+      p_company: $('#company').value, p_consent: $('#consent').checked
+    });
+    busy(btn, false);
+    if (r && r.ok) { P.set(r.token); location.href = next || '/passport.html?welcome=1'; return; }
+    $('#err').hidden = false;
+    $('#err').textContent = msg(r);
+    if (r && r.code === 'NOT_PREREGISTERED') {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn ghost sm'; b.style.marginTop = '10px'; b.textContent = 'ลงทะเบียนแบบ Walk-in';
+      b.onclick = () => { setMode(true); $('#name').focus(); };
+      $('#err').appendChild(document.createElement('br')); $('#err').appendChild(b);
+    }
+  });
+})();
+</script>
+</body>
+</html>

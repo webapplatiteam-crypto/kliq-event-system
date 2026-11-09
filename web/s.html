@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<title>สะสมแสตมป์ | KLIQ Experience</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="dark">
+<main class="app">
+  <div class="stripe" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+  <div id="content" style="flex:1;display:flex;flex-direction:column;gap:18px"><p class="loading">กำลังบันทึกแสตมป์…</p></div>
+</main>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+<script>
+(function () {
+  const { $, rpc, msg, esc, fmtTime, P, busy } = K;
+  const st = new URLSearchParams(location.search).get('t');
+  const box = $('#content');
+  const ICON_WARN = '<svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#E0A06A" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6"/><path d="M12 17h.01"/></svg>';
+
+  if (!st) { box.innerHTML = `<div class="notice err">ไม่พบรหัสฐาน กรุณาสแกน QR ใหม่</div><a class="btn" href="/passport.html">ไปที่ Passport</a>`; return; }
+
+  function backBtns() {
+    return `<div class="spacer"></div><a class="btn" href="/passport.html">กลับไปที่ Passport</a>`;
+  }
+
+  async function collect() {
+    box.innerHTML = '<p class="loading">กำลังบันทึกแสตมป์…</p>';
+    const r = await rpc('collect_stamp', { p_token: P.token(), p_station_token: st });
+    if (r && r.ok) {
+      if (navigator.vibrate) navigator.vibrate([60, 60, 120]);
+      const bars = Array.from({ length: r.total }, (_, i) => `<i style="width:34px;height:8px;border-radius:4px;background:${i < r.done ? 'var(--gold)' : 'var(--raise)'}"></i>`).join('');
+      box.innerHTML = `<div class="eyebrow center">STAMP COLLECTED</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:20px;justify-content:center;align-items:center">
+          <div class="stamp-big"><div><span style="font-size:13px;letter-spacing:3px;font-weight:500">ฐาน</span><b>${r.station_id}</b><span style="font-size:12px">${fmtTime(new Date().toISOString())}</span></div></div>
+          <h1>ได้รับแสตมป์แล้ว!</h1><div style="color:var(--ink2)">${esc(r.station)}</div>
+          <div style="display:flex;gap:8px" role="img" aria-label="สะสมแล้ว ${r.done} จาก ${r.total} ฐาน">${bars}</div>
+          <div>${r.completed ? '<b style="color:var(--gold);font-weight:500">ครบทุกฐานแล้ว!</b> ไปรับของที่ระลึกได้เลย' : 'อีก <b style="color:var(--gold);font-weight:500">' + (r.total - r.done) + ' ฐาน</b> รับของที่ระลึก'}</div>
+        </div>${backBtns()}`;
+      return;
+    }
+    if (r && r.code === 'NO_PARTICIPANT' || !P.token()) { P.clear(); recover(); return; }
+    let extra = '';
+    if (r && r.code === 'ALREADY') extra = `<div class="muted center">บันทึกไว้เมื่อ ${fmtTime(r.at)}</div>`;
+    box.innerHTML = `<div style="flex:1;display:flex;flex-direction:column;gap:16px;justify-content:center">
+        <div class="alert-big">${ICON_WARN}</div>
+        <h1 class="center" style="font-size:22px">${esc(msg(r))}</h1>${extra}
+        ${r && r.code === 'TOO_SOON' ? '<button class="btn ghost" id="retry">ลองอีกครั้ง</button>' : ''}
+        ${r && r.code === 'NETWORK' ? '<button class="btn ghost" id="retry">ลองอีกครั้ง</button>' : ''}
+      </div>${backBtns()}`;
+    const rb = $('#retry'); if (rb) rb.onclick = collect;
+  }
+
+  // เปิดจากแอปกล้องแต่เบราว์เซอร์นี้ยังไม่มีสิทธิ์: ให้กรอกเบอร์เพื่อเข้าสิทธิ์เดิม
+  function recover() {
+    box.innerHTML = `<h1 style="font-size:22px">ยืนยันตัวตนเพื่อรับแสตมป์</h1>
+      <p class="muted" style="margin:0">กรอกเบอร์โทรที่ใช้ลงทะเบียน ระบบจะเปิด Passport ของคุณและบันทึกแสตมป์ให้ทันที</p>
+      <form id="rf" style="display:flex;flex-direction:column;gap:14px">
+        <div class="field"><label for="ph">เบอร์โทรศัพท์</label><input class="input" id="ph" type="tel" inputmode="tel" placeholder="08X-XXX-XXXX" required></div>
+        <div id="rerr" class="notice err" hidden role="alert"></div>
+        <button class="btn" id="rb" type="submit">ยืนยันและรับแสตมป์</button>
+      </form>
+      <p class="small muted" style="margin:0">ยังไม่เคยลงทะเบียน? <a href="/index.html?next=${encodeURIComponent('/s.html?t=' + st)}">ลงทะเบียนก่อน</a></p>`;
+    $('#rf').onsubmit = async e => {
+      e.preventDefault();
+      busy($('#rb'), true);
+      const r = await rpc('register_participant', { p_phone: $('#ph').value, p_walkin: false, p_consent: false });
+      busy($('#rb'), false);
+      if (r && r.ok && r.existing) { P.set(r.token); collect(); return; }
+      $('#rerr').hidden = false;
+      $('#rerr').innerHTML = r && (r.code === 'NOT_PREREGISTERED' || r.code === 'NEED_CONSENT')
+        ? 'ยังไม่พบการลงทะเบียนด้วยเบอร์นี้ <a href="/index.html?next=' + encodeURIComponent('/s.html?t=' + st) + '">ลงทะเบียนที่นี่</a>'
+        : esc(msg(r));
+    };
+  }
+
+  if (!P.token()) recover(); else collect();
+})();
+</script>
+</body>
+</html>

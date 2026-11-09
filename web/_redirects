@@ -1,0 +1,4 @@
+# Netlify redirects (เทียบเท่า vercel.json)
+/staff   /staff/login.html   301
+/admin   /admin/index.html   301
+/stage   /stage/index.html   301

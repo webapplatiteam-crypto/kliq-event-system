@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ของที่ระลึก | KLIQ Admin</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="light">
+<div class="layout">
+  <nav class="side" id="side" aria-label="เมนูแอดมิน"></nav>
+  <main class="main">
+    <div class="head">
+      <div><h1>จุดรับของที่ระลึก</h1><div class="sub">สำหรับผู้ที่เล่นครบทุกฐาน · 1 ท่าน 1 ชิ้น</div></div>
+      <a class="lbtn primary" href="/staff/souvenir.html">เปิดหน้าเจ้าหน้าที่</a>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="cols">
+      <section><h2 style="margin-bottom:10px">รอรับของ (ครบแล้วแต่ยังไม่มารับ)</h2><div class="tablebox"><table><thead><tr><th>รหัส</th><th>ชื่อ</th><th>เบอร์</th><th>ครบเมื่อ</th></tr></thead><tbody id="wait"></tbody></table></div></section>
+      <section><h2 style="margin-bottom:10px">มอบแล้วล่าสุด</h2><div class="tablebox"><table><thead><tr><th>เวลา</th><th>รหัส</th><th>ชื่อ</th></tr></thead><tbody id="done"></tbody></table></div></section>
+    </div>
+  </main>
+</div>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+<script src="/admin/admin.js"></script>
+<script>
+(async function () {
+  const { $, rpc, esc, fmtTime } = K;
+  const me = await AdminShell('souvenir', ['souvenir']);
+  if (!me) return;
+  async function load() {
+    const [st, w, d] = await Promise.all([
+      rpc('admin_stats', { p_token: me.token }),
+      rpc('admin_participants', { p_token: me.token, p_search: '', p_filter: 'waiting', p_limit: 100, p_offset: 0 }),
+      rpc('admin_participants', { p_token: me.token, p_search: '', p_filter: 'souvenir', p_limit: 500, p_offset: 0 })]);
+    if (st && st.ok) $('#kpis').innerHTML = [['มอบแล้วทั้งหมด', st.souvenir], ['แบบพิเศษ (ครบทุกฐาน)', st.souvenir_premium], ['แบบทั่วไป', st.souvenir_basic], ['ครบทุกฐานแต่ยังไม่ได้ของพิเศษ', st.completed - st.souvenir_premium, 1]]
+      .map(x => `<div class="kpi ${x[2] ? 'dark' : ''}"><span class="l">${x[0]}</span><span class="v">${x[1]}</span></div>`).join('');
+    if (w && w.ok) $('#wait').innerHTML = w.rows.map(p => `<tr><td class="sub">${esc(p.ref_code)}</td><td>${esc(p.name)}</td><td>${esc(p.phone)}</td><td>${fmtTime(p.completed_at)}</td></tr>`).join('') || '<tr><td colspan="4" class="sub">ไม่มี</td></tr>';
+    if (d && d.ok) $('#done').innerHTML = d.rows.sort((a, b) => b.souvenir_at.localeCompare(a.souvenir_at)).slice(0, 30)
+      .map(p => `<tr><td>${fmtTime(p.souvenir_at)}</td><td class="sub">${esc(p.ref_code)}</td><td>${esc(p.name)} <span class="pill ${p.souvenir_tier === 'premium' ? 'done' : 'wait'}">${p.souvenir_tier === 'premium' ? 'พิเศษ' : 'ทั่วไป'}</span></td></tr>`).join('') || '<tr><td colspan="3" class="sub">ยังไม่มี</td></tr>';
+  }
+  load(); setInterval(() => { if (!document.hidden) load(); }, 15000);
+})();
+</script>
+</body>
+</html>

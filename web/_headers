@@ -1,0 +1,13 @@
+# Netlify headers (เทียบเท่า vercel.json)
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(self), microphone=(), geolocation=()
+  X-Frame-Options: DENY
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=604800
+
+/vendor/*
+  Cache-Control: public, max-age=604800

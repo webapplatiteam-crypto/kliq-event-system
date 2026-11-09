@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เข้าสู่ระบบเจ้าหน้าที่ | KLIQ</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="light">
+<main style="max-width:420px;margin:0 auto;padding:48px 20px;display:flex;flex-direction:column;gap:22px">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+    <div style="width:72px;height:72px;border-radius:20px;background:#121212;display:flex;align-items:center;justify-content:center">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#C9A063" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+    <div style="font-size:12px;letter-spacing:3px;color:#8A6A3C">KLIQ · STAFF &amp; ADMIN</div>
+    <h1>เข้าสู่ระบบเจ้าหน้าที่</h1>
+  </div>
+  <form id="f" class="lcard">
+    <label class="lfield">รหัสเจ้าหน้าที่<input class="linput" id="code" autocomplete="username" autocapitalize="characters" placeholder="เช่น STAFF01" required></label>
+    <label class="lfield">PIN 6 หลัก<input class="linput" id="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6" placeholder="••••••" required style="letter-spacing:6px"></label>
+    <div id="err" class="lnotice" hidden role="alert"></div>
+    <button class="lbtn primary" id="b" type="submit" style="min-height:52px">เข้าสู่ระบบ</button>
+  </form>
+  <p class="sub" style="text-align:center;margin:0">ลืม PIN? ติดต่อแอดมินประจำงาน</p>
+</main>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+<script>
+(function () {
+  const { $, rpc, msg, busy, STAFF } = K;
+  const next = new URLSearchParams(location.search).get('next');
+  const cur = STAFF.get();
+  if (cur && cur.token) rpc('staff_me', { p_token: cur.token }).then(r => { if (r && r.ok) location.replace(next || STAFF.home(r.role)); });
+  $('#f').onsubmit = async e => {
+    e.preventDefault();
+    busy($('#b'), true);
+    const r = await rpc('staff_login', { p_code: $('#code').value, p_pin: $('#pin').value });
+    busy($('#b'), false);
+    if (r && r.ok) { STAFF.set({ token: r.token, role: r.role, name: r.name, code: r.code }); location.href = (next && next.indexOf('/') === 0 ? next : STAFF.home(r.role)); return; }
+    $('#err').hidden = false; $('#err').textContent = msg(r); $('#pin').value = ''; $('#pin').focus();
+  };
+})();
+</script>
+</body>
+</html>

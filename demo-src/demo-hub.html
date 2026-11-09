@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<title>KLIQ Experience Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="app.css">
+<style>
+  .hub { max-width: 1040px; margin: 0 auto; padding: 28px max(16px, env(safe-area-inset-left,0px)) 80px max(16px, env(safe-area-inset-right,0px)); display: flex; flex-direction: column; gap: 26px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; }
+  .box { border-radius: 20px; background: var(--panel); border: 1px solid var(--line); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .box h2 { display: flex; align-items: center; gap: 10px; }
+  .box .n { width: 30px; height: 30px; border-radius: 15px; background: var(--gold); color: #121212; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 500; }
+  .box a.btn { min-height: 48px; font-size: 15px; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; color: var(--ink2); }
+  .kv b { color: var(--gold); font-weight: 500; letter-spacing: 1px; }
+  .qrs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .qrs a { display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: var(--ink2); font-size: 12px; background: #fff; border-radius: 10px; padding: 8px 4px; }
+  .qrs a svg { width: 76px; height: 76px; }
+  .qrs a span { color: #121212; }
+  code { font-family: ui-monospace, monospace; font-size: 13px; background: var(--raise); padding: 1px 6px; border-radius: 6px; }
+  ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--ink2); line-height: 1.5; }
+</style>
+</head>
+<body class="dark">
+<main class="hub">
+  <div class="stripe" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+  <header style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px">
+    <div>
+      <div class="eyebrow">KLIQ EXPERIENCE · DEMO</div>
+      <h1 style="font-size:32px;margin-top:6px">ลิงก์ทดลองระบบงานเปิดตัว KLIQ</h1>
+      <p style="margin:6px 0 0;color:var(--ink2);max-width:640px;line-height:1.6">ระบบจริงทั้งหมด ทำงานด้วยข้อมูลตัวอย่าง 132 คน เก็บไว้ในเบราว์เซอร์ของคุณเท่านั้น ไม่มีการส่งข้อมูลไปที่ไหน ลองกดได้ทุกปุ่ม กด "ล้างข้อมูลเริ่มใหม่" ได้ตลอด</p>
+    </div>
+    <button class="btn ghost sm" id="reset">ล้างข้อมูลเริ่มใหม่</button>
+  </header>
+
+  <div class="grid">
+    <section class="box">
+      <h2><span class="n">1</span>ลูกค้า: ลงทะเบียน + เปิดการ์ด</h2>
+      <p class="small muted" style="margin:0">เปิดบนมือถือจะเหมือนงานจริงที่สุด หรือกด F12 เลือกโหมดมือถือ</p>
+      <div class="kv"><span>ลงทะเบียนล่วงหน้า</span><b>081-111-1111</b><span>อีกเบอร์</span><b>082-222-2222</b><span>Walk-in</span><span>กรอกเบอร์อะไรก็ได้ที่ยังไม่เคยใช้</span></div>
+      <a class="btn" href="register.html">เปิดหน้าลงทะเบียน</a>
+      <a class="btn ghost sm" href="passport.html" style="width:100%">ไปที่ Passport (ถ้าลงทะเบียนแล้ว)</a>
+    </section>
+
+    <section class="box">
+      <h2><span class="n">2</span>ลูกค้า: สแกน QR ฐาน</h2>
+      <p class="small muted" style="margin:0">ในงานจริงลูกค้าใช้กล้องสแกน QR ที่เจ้าหน้าที่ถือ ในเดโมกดลิงก์แทนการสแกนได้เลย (ลงทะเบียนก่อน)</p>
+      <div class="qrs" id="qrs"></div>
+      <a class="btn ghost sm" href="scan.html" style="width:100%">เปิดหน้ากล้องสแกน (ต้องอนุญาตกล้อง)</a>
+    </section>
+
+    <section class="box">
+      <h2><span class="n">3</span>เจ้าหน้าที่จุดรับของที่ระลึก</h2>
+      <div class="kv"><span>รหัส</span><b>STAFF01</b><span>PIN</span><b>123456</b></div>
+      <p class="small muted" style="margin:0">ลองค้นหารหัสตัวอย่าง (หรือพิมพ์เบอร์ของคนที่ลงทะเบียนแล้ว):</p>
+      <div class="kv"><span>ครบ 6 ฐาน → ของพิเศษ</span><b id="doneRef">PP-0001</b><span>ไม่ได้เล่น → ของทั่วไป</span><b id="freshRef">–</b><span>เล่นไม่ครบ → ของทั่วไป</span><b id="partRef">–</b></div>
+      <p class="small muted" style="margin:0">เบอร์ 081-111-1111 เป็น "ลงทะเบียนล่วงหน้า" ค้นได้ก็ต่อเมื่อกดลงทะเบียนในกล่องที่ 1 แล้ว</p>
+      <a class="btn" href="staff/souvenir.html">เปิดหน้าเจ้าหน้าที่</a>
+    </section>
+
+    <section class="box">
+      <h2><span class="n">4</span>จอเวที Lucky Draw</h2>
+      <div class="kv"><span>รหัส</span><b>MC01</b><span>PIN</span><b>123456</b></div>
+      <p class="small muted" style="margin:0">เปิดบนคอม กด F เต็มจอ กด Space ทีละขั้น: คัดการ์ด 5→3 → เปิดการ์ดรางวัลที่ 3 → หมุนวงล้อ → ป๊อปอัป + นับถอยหลัง (Enter อยู่ / N ไม่อยู่หมุนใหม่) → การ์ดที่ 2 → การ์ดที่ 1 (คนละ SKU)</p>
+      <a class="btn" href="stage/index.html">เปิดจอเวที</a>
+    </section>
+
+    <section class="box">
+      <h2><span class="n">5</span>หลังบ้านแอดมิน</h2>
+      <div class="kv"><span>รหัส</span><b>ADMIN01</b><span>PIN</span><b>123456</b></div>
+      <p class="small muted" style="margin:0">ภาพรวมสด รายชื่อ 132 คน นำเข้า CSV พิมพ์ QR ตั้งค่ารางวัล 3 รางวัล (ชื่อ รูป รายละเอียด) ตัดยอด ยกเลิกสิทธิ์ Export</p>
+      <a class="btn" href="admin/index.html">เปิดหลังบ้าน</a>
+    </section>
+
+    <section class="box">
+      <h2><span class="n">6</span>ลำดับการลองที่แนะนำ</h2>
+      <ol>
+        <li>ลงทะเบียนด้วยเบอร์ 081-111-1111 ดูการสุ่มการ์ด</li>
+        <li>กด QR ฐาน 1–6 ในกล่องที่ 2 จนครบ ดูหน้า Souvenir Pass</li>
+        <li>เข้า STAFF01 ค้นรหัส PP ของคุณ ดูป้ายบอกแบบของที่ระลึก กดมอบ แล้วลองกดซ้ำ</li>
+        <li>เข้า MC01 เปิดรอบชิง กด Space คัดการ์ดเหลือ 3 → เปิดการ์ด → หมุนวงล้อ ลองกด N (ไม่อยู่) ดูการหมุนใหม่ แล้ว Enter จนครบที่ 1</li>
+        <li>กลับไปหน้า Passport ของผู้ชนะ (หลังบ้าน → Lucky Draw ดูชื่อ) จะเห็นประกาศบนมือถือ</li>
+      </ol>
+    </section>
+  </div>
+  <p class="small muted">หน้าเดโมนี้ใช้โค้ดชุดเดียวกับระบบจริง ต่างกันแค่ตัวเก็บข้อมูล ระบบจริงใช้ Supabase และทุกคนเห็นข้อมูลชุดเดียวกัน</p>
+</main>
+<script src="demo-backend.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script>
+(function () {
+  const base = location.href.replace(/[^/]*$/, '');
+  const st = KLIQ_DEMO.stations();
+  function qr(text, size) {
+    const q = qrcode(0, 'M'); q.addData(text); q.make(); const n = q.getModuleCount(), m = 2; let d = '';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) d += 'M' + (c + m) + ' ' + (r + m) + 'h1v1h-1z';
+    return '<svg viewBox="0 0 ' + (n + 4) + ' ' + (n + 4) + '" shape-rendering="crispEdges" aria-hidden="true"><rect width="100%" height="100%" fill="#fff"/><path d="' + d + '" fill="#111"/></svg>';
+  }
+  document.getElementById('qrs').innerHTML = st.map(s => `<a href="s.html?t=${encodeURIComponent(s.qr_token)}">${qr(base + 's.html?t=' + s.qr_token, 76)}<span>ฐาน ${s.id} · ${s.name}</span></a>`).join('');
+  const sm = KLIQ_DEMO.sample(); if (sm.completed[0]) document.getElementById('doneRef').textContent = sm.completed[0].ref_code;
+  if (sm.fresh && sm.fresh[0]) document.getElementById('freshRef').textContent = sm.fresh[0].ref_code;
+  if (sm.partial && sm.partial[0]) document.getElementById('partRef').textContent = sm.partial[0].ref_code;
+  document.getElementById('reset').onclick = () => { KLIQ_DEMO.reset(); location.reload(); };
+})();
+</script>
+</body>
+</html>

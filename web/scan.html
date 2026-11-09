@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080808">
+<title>สแกน QR ฐาน | KLIQ Experience</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="dark" style="background:#080808">
+<main class="app">
+  <div class="topbar">
+    <a href="/passport.html" class="btn ghost sm" style="min-height:44px">‹ กลับ</a>
+    <span>สแกน QR ที่ฐาน</span><span style="width:60px"></span>
+  </div>
+  <div class="scanbox"><video id="v" playsinline muted></video><div class="frame" aria-hidden="true"></div></div>
+  <div style="text-align:center;display:flex;flex-direction:column;gap:6px">
+    <h2>หันกล้องไปที่ QR ของฐาน</h2>
+    <p class="muted small" style="margin:0">ขอ QR จากเจ้าหน้าที่หลังทำกิจกรรมเสร็จ</p>
+  </div>
+  <div id="err" class="notice err" hidden role="alert"></div>
+  <div class="notice small" style="color:var(--ink2)">เปิดกล้องไม่ได้? ใช้แอปกล้องของมือถือสแกน QR ของฐานได้เหมือนกัน ระบบจะบันทึกแสตมป์ให้อัตโนมัติ</div>
+</main>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+<script src="/vendor/jsQR.js"></script>
+<script>
+(function () {
+  const { $, P, startScanner } = K;
+  if (!P.token()) { location.replace('/index.html'); return; }
+  function stationToken(text) {
+    try { const u = new URL(text); const t = u.searchParams.get('t'); if (t) return t; } catch (e) {}
+    if (/^[A-Za-z0-9_-]{12,40}$/.test(text)) return text;
+    return null;
+  }
+  let busy = false;
+  startScanner($('#v'), text => {
+    if (busy) return false;
+    if (text.indexOf('KLIQ:') === 0) { $('#err').hidden = false; $('#err').textContent = 'นี่คือ QR รับของที่ระลึก กรุณาสแกน QR ของฐานกิจกรรม'; return false; }
+    const t = stationToken(text);
+    if (!t) { $('#err').hidden = false; $('#err').textContent = 'QR นี้ไม่ใช่ของงาน KLIQ กรุณาสแกน QR จากเจ้าหน้าที่ประจำฐาน'; return false; }
+    busy = true;
+    if (navigator.vibrate) navigator.vibrate(60);
+    location.href = '/s.html?t=' + encodeURIComponent(t) + '&from=app';
+    return true;
+  }, () => {
+    $('#err').hidden = false;
+    $('#err').textContent = 'ไม่ได้รับอนุญาตให้ใช้กล้อง กรุณากดอนุญาตกล้องในเบราว์เซอร์ หรือใช้แอปกล้องของมือถือสแกนแทน';
+  });
+})();
+</script>
+</body>
+</html>

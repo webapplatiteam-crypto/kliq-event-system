@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lucky Draw – สุ่มรางวัล | KLIQ</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="stage">
+<div class="stagewrap" style="flex-direction:row;flex-wrap:wrap;gap:4vw">
+  <div style="flex:1 1 600px;display:flex;flex-direction:column;gap:3vh">
+    <div><div class="eyebrow" style="letter-spacing:6px">KLIQ LAUNCH · LUCKY DRAW</div>
+      <h1>รางวัล <span id="prize" style="color:var(--gold)"></span></h1>
+      <div class="muted" id="sub"></div></div>
+    <div style="flex:1;min-height:40vh;border-radius:32px;border:1px solid var(--goldline);background:rgba(28,28,28,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px">
+      <img id="pimg" alt="" hidden style="width:clamp(120px,16vw,240px);height:clamp(120px,16vw,240px);object-fit:cover;border-radius:24px;border:1px solid var(--gold);background:#fff">
+      <div class="eyebrow" id="label">READY</div>
+      <div class="bigno" id="no" aria-live="polite">— — —</div>
+      <div id="nm" style="font-size:clamp(20px,2vw,34px)"></div>
+    </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap">
+      <button class="stagebtn" id="go" disabled>สุ่มรางวัล</button>
+      <button class="stagebtn ghost" id="fs">เต็มจอ (F)</button>
+      <a class="stagebtn ghost" href="/stage/index.html" style="display:inline-flex;align-items:center;text-decoration:none">เลือกรางวัลอื่น</a>
+    </div>
+  </div>
+  <aside style="flex:0 1 380px;border-radius:28px;background:rgba(242,240,236,.06);border:1px solid rgba(242,240,236,.12);padding:28px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="font-size:24px">ผู้โชคดี</h2><span id="count" style="color:var(--gold)"></span></div>
+    <div id="list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </aside>
+</div>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+<script>
+(async function () {
+  const { $, rpc, msg, esc, STAFF, toast, sleep } = K;
+  const me = await STAFF.guard(['mc']);
+  if (!me) return;
+  const prizeId = +new URLSearchParams(location.search).get('prize');
+  let prize = null, working = false;
+
+  async function refresh() {
+    const [pz, res] = await Promise.all([rpc('admin_prizes', { p_token: me.token }), rpc('draw_results_list', { p_token: me.token })]);
+    prize = pz.ok && pz.rows.find(z => z.id === prizeId);
+    if (!prize) { toast('ไม่พบรางวัล', 'err'); return; }
+    $('#prize').textContent = prize.name;
+    $('#sub').textContent = (prize.description ? prize.description + ' · ' : '') + 'สุ่มทีละรางวัล ทั้งหมด ' + prize.quantity + ' รางวัล · ผู้ได้รางวัลแล้วไม่ถูกสุ่มซ้ำ';
+    if (prize.image) { $('#pimg').src = prize.image; $('#pimg').hidden = false; }
+    const rows = (res.ok ? res.rows : []).filter(r => r.prize_id === prizeId && !r.voided).reverse();
+    $('#count').textContent = rows.length + ' / ' + prize.quantity;
+    $('#list').innerHTML = rows.length ? rows.map((r, i) => `<div style="display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:14px;background:rgba(28,28,28,.9)">
+      <span style="width:34px;height:34px;border-radius:17px;background:var(--gold);color:#121212;display:flex;align-items:center;justify-content:center;font-weight:500">${i + 1}</span>
+      <span style="font-size:20px;letter-spacing:2px;min-width:90px">${esc(r.ticket_no)}</span><span style="color:var(--ink2)">${esc(r.name)}</span></div>`).join('')
+      : '<div class="muted">ยังไม่มีผู้โชคดี กดสุ่มเพื่อเริ่ม</div>';
+    $('#go').textContent = rows.length >= prize.quantity ? 'ครบทุกรางวัลแล้ว' : 'สุ่มรางวัลที่ ' + (rows.length + 1);
+    $('#go').disabled = rows.length >= prize.quantity;
+  }
+
+  async function draw() {
+    if (working || !prize || $('#go').disabled) return;
+    working = true; $('#go').disabled = true;
+    $('#label').textContent = 'กำลังสุ่ม…'; $('#nm').textContent = '';
+    const letters = 'UIFNC';
+    let spinning = true;
+    (async () => { while (spinning) { $('#no').textContent = letters[Math.floor(Math.random() * 5)] + '-' + String(Math.floor(Math.random() * 100) + 1).padStart(3, '0'); await sleep(70); } })();
+    const [r] = await Promise.all([rpc('draw_prize_next', { p_token: me.token, p_prize_id: prizeId }, { tries: 1 }), sleep(1800)]);
+    spinning = false; await sleep(80);
+    working = false; $('#go').disabled = false;
+    if (r && r.ok) {
+      $('#label').textContent = 'รางวัลที่ ' + r.n + ' · ' + r.series_name;
+      $('#no').textContent = r.ticket_no; $('#nm').textContent = r.name;
+    } else { $('#label').textContent = 'READY'; $('#no').textContent = '— — —'; toast(msg(r), 'err'); }
+    refresh();
+  }
+
+  $('#go').onclick = draw;
+  $('#fs').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); draw(); }
+    if (e.key === 'f' || e.key === 'F') $('#fs').click();
+  });
+  refresh();
+})();
+</script>
+</body>
+</html>

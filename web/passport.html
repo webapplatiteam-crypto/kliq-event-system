@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<title>Passport | KLIQ Experience</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="dark">
+<main class="app" id="app">
+  <div class="stripe" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="topbar"><span class="brand">KLIQ</span><span id="hello" class="small"></span></div>
+  <div id="content" style="display:flex;flex-direction:column;gap:18px"><p class="loading">กำลังโหลด…</p></div>
+</main>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+<script src="/vendor/qrcode.js"></script>
+<script>
+(function () {
+  const { $, rpc, msg, esc, fmtTime, P, seriesImg, inkFor, qrSvg } = K;
+  const token = P.token();
+  if (!token) { location.replace('/index.html'); return; }
+  const welcome = new URLSearchParams(location.search).has('welcome');
+  let reveal = welcome && K.LS.get('kliq_revealed') !== token;   // เปิดการ์ดครั้งแรกหลังลงทะเบียน
+  const SER = [['U','UNO','#808A70'],['I','IKON','#15435A'],['F','FORMA','#DCC7B3'],['N','NOVA','#533D37'],['C','CASA','#96979C']];
+  const CHECK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#121212" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>';
+
+  async function load() {
+    const r = await rpc('get_passport', { p_token: token });
+    if (r && r.code === 'NO_PARTICIPANT') { P.clear(); location.replace('/index.html'); return; }
+    if (!r || !r.ok) { if (!$('#ticket')) $('#content').innerHTML = `<div class="notice err">${esc(msg(r))}</div><button class="btn ghost" onclick="location.reload()">ลองใหม่</button>`; return; }
+    render(r);
+  }
+
+  function render(r) {
+    const p = r.participant, st = r.stamps, done = st.filter(s => s.done).length, total = st.length;
+    const ink = inkFor(p.series_code);
+    $('#hello').textContent = 'สวัสดี, ' + p.name.split(' ')[0];
+    let html = '';
+
+    if (r.called && !r.won) {
+      html += `<section class="win" aria-live="assertive" style="animation:pulsecall 1s ease-in-out infinite alternate">
+        <div class="eyebrow">STAGE CALL</div>
+        <h2 style="font-size:24px">วงล้อหยุดที่คุณ! กรุณาขึ้นเวทีทันที</h2>
+        ${r.called.image ? `<img src="${r.called.image}" alt="" style="width:120px;height:120px;object-fit:cover;border-radius:16px;background:#fff">` : ''}
+        <div class="prize">รางวัลที่ ${esc(String(r.called.rank))} · ${esc(r.called.prize || '')}</div>
+        <div class="small" style="color:var(--ink2)">แสดงหน้านี้กับพิธีกร · หากไม่ขึ้นเวทีภายในเวลาที่กำหนด จะสุ่มผู้โชคดีท่านใหม่</div></section>
+        <style>@keyframes pulsecall { from { box-shadow:0 0 0 rgba(201,160,99,0) } to { box-shadow:0 0 40px rgba(201,160,99,.6) } }</style>`;
+    }
+    if (r.won) {
+      html += `<section class="win" aria-live="polite">
+        <div class="eyebrow">CONGRATULATIONS</div>
+        <h2 style="font-size:24px">ยินดีด้วย! คุณคือผู้โชคดี</h2>
+        ${r.won.image ? `<img src="${r.won.image}" alt="" style="width:140px;height:140px;object-fit:cover;border-radius:18px;background:#fff">` : ''}
+        <div class="prize">${r.won.rank ? 'รางวัลที่ ' + r.won.rank + ' · ' : ''}${esc(r.won.prize)}</div>
+        ${r.won.description ? `<div class="small" style="color:var(--ink2)">${esc(r.won.description)}</div>` : ''}
+        <div class="small" style="color:var(--ink2)">ขึ้นรับรางวัลที่เวที แสดงหน้านี้และบัตรประชาชนกับเจ้าหน้าที่</div>
+        <div class="small muted">รหัสตรวจสอบ ${esc(r.won.check)} · ${fmtTime(r.won.at)}</div></section>`;
+    } else if (welcome) {
+      html += `<div style="display:flex;flex-direction:column;gap:4px"><span style="color:var(--ok);font-size:15px">✓ ลงทะเบียนสำเร็จ</span><h1 style="font-size:24px">คุณได้รับสิทธิ์ลุ้นรางวัลแล้ว</h1></div>`;
+    }
+
+    html += `<section class="ticket" id="ticket" style="position:relative;background:${esc(p.series_color)};color:${ink}">
+      ${reveal ? '<div id="shuffle" class="shuffle"><span class="eyebrow">กำลังสุ่มการ์ดของคุณ</span><b id="shName">KLIQ</b><span class="small">UNO · IKON · FORMA · NOVA · CASA</span></div>' : ''}
+      <img src="${seriesImg(p.series_code, 'l')}" alt="สวิตช์ KLIQ ${esc(p.series_name)}">
+      <div class="row"><span style="font-size:12px;letter-spacing:3px">LUCKY DRAW TICKET</span><span class="pill">${esc(p.series_name)} SERIES</span></div>
+      <div style="text-align:center;font-size:13px;opacity:.85">หมายเลขลุ้นโชค · ${esc(p.series_tagline)}</div>
+      <div class="no">${esc(p.ticket_no)}</div>
+      <div class="dash"></div>
+      <div class="meta"><div><small>ชื่อผู้ร่วมงาน</small>${esc(p.name)}</div><div><small>รหัสอ้างอิง</small>${esc(p.ref_code)}</div></div>
+    </section>
+    <div class="card" style="display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center;padding:16px">
+      <span class="eyebrow">GRAND PRIZE</span>
+      ${r.grand && r.grand.image ? `<img src="${r.grand.image}" alt="" style="width:150px;height:150px;object-fit:cover;border-radius:18px;background:#fff;margin:4px 0">` : ''}
+      <b style="font-size:22px;font-weight:500;color:var(--gold)">ลุ้นรับ ${esc(r.grand && r.grand.name || 'iPhone')} และรางวัลใหญ่</b>
+      ${r.grand && r.grand.description ? `<span class="small" style="color:var(--ink2)">${esc(r.grand.description)}</span>` : ''}
+      <span class="small" style="color:var(--ink2)">${esc(r.event.announce_text || 'ประกาศผลบนเวที')} · ต้องอยู่ในงานเพื่อรับรางวัล</span>
+    </div>`;
+
+    const showJourney = done > 0 || p.completed_at || K.LS.get('kliq_journey') === token;
+    if (!showJourney) {
+      html += `<section class="card" style="display:flex;flex-direction:column;gap:10px;padding:18px">
+        <h2>Exhibition Journey</h2>
+        <p class="small" style="margin:0;color:var(--ink2);line-height:1.6">เดินชม ${total} ฐานกิจกรรม สแกน QR ที่แต่ละฐาน ครบทุกฐานรับของที่ระลึกก่อนกลับ (ไม่บังคับ)</p>
+        <button class="btn" id="goJourney">ไปเล่นฐานกิจกรรม</button></section>`;
+    } else html += `<section style="display:flex;flex-direction:column;gap:12px" aria-labelledby="jt">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 id="jt">Exhibition Journey</h2>
+      <span style="color:var(--gold)"><b style="font-size:24px;font-weight:500">${done}</b> / ${total} ฐาน</span></div>
+      <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}"><i style="width:${total ? done / total * 100 : 0}%"></i></div>
+      <div class="stations">${st.map((s, i) => `<div class="station ${s.done ? 'done' : ''}">
+        <div class="n">ฐาน ${i + 1}<span class="dot">${s.done ? CHECK : ''}</span></div>
+        <div><div class="t">${esc(s.name)}</div><div class="s">${s.done ? fmtTime(s.at) : 'ยังไม่ได้สแกน'}</div></div></div>`).join('')}</div>
+    </section>`;
+
+    const ev = r.event || {}, basicN = ev.souvenir_basic_name || 'ของที่ระลึกทั่วไป', premN = ev.souvenir_premium_name || 'ของที่ระลึกพิเศษ (เล่นครบทุกฐาน)';
+    if (showJourney && !p.completed_at) {
+      html += `<a class="btn" href="/scan.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v3"/><path d="M20 16v3a1 1 0 0 1-1 1h-3"/><path d="M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M4 12h16"/></svg>สแกน QR ที่ฐาน</a>
+      <p class="small muted center" style="margin:-6px 0 0">ไม่บังคับ · เล่นครบทุกฐานรับ${esc(premN)} · หรือใช้กล้องมือถือสแกนได้เลย</p>`;
+    }
+    // Souvenir Pass: ทุกคนรับของที่ระลึกได้ · ครบทุกฐานได้แบบพิเศษ
+    const gotPrem = p.souvenir_tier === 'premium', upgradable = p.souvenir_at && !gotPrem && p.completed_at;
+    html += `<section style="display:flex;flex-direction:column;gap:10px">
+      <div class="eyebrow center">${p.completed_at ? 'JOURNEY COMPLETE' : 'SOUVENIR PASS'}</div>
+      <h2 class="center">${upgradable ? 'ครบทุกฐานแล้ว! แสดง QR รับ' + esc(premN) + 'เพิ่ม'
+        : p.souvenir_at ? 'รับ' + esc(gotPrem ? premN : basicN) + 'เรียบร้อยแล้ว'
+        : p.completed_at ? 'ครบทุกฐาน! แสดง QR นี้รับ' + esc(premN) : 'แสดง QR นี้ที่จุดรับของที่ระลึก'}</h2>
+      <div class="pass"><div class="qr">${qrSvg('KLIQ:' + p.ref_code, 120)}</div>
+        <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;letter-spacing:2px;color:#5C5852">SOUVENIR PASS</span>
+        <b style="font-size:19px;font-weight:500">${esc(p.name)}</b><span>${esc(p.ref_code)}</span>
+        <span style="font-size:13px;color:#5C5852">${p.souvenir_at && !upgradable ? 'รับแล้ว ' + fmtTime(p.souvenir_upgraded_at || p.souvenir_at) : p.completed_at ? 'ครบเมื่อ ' + fmtTime(p.completed_at) : esc(basicN) + ' · เล่นครบ ' + total + ' ฐานรับ' + esc(premN)}</span></div></div></section>`;
+    html += `<a class="linkcard" href="/collection.html"><img src="${seriesImg(p.series_code, 'p')}" alt="">
+      <div style="flex:1"><div style="font-weight:500">${esc(p.series_name)} · ดู KLIQ ทั้ง 5 ซีรีส์</div><div class="small muted">รูปสินค้า สเปก และจุดเด่นของแต่ละซีรีส์</div></div>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C9A063" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a>
+      <p class="small center" style="margin:0"><a href="/index.html?new=1" onclick="return confirm('ออกจากบัญชีนี้บนเครื่องนี้?') && (K.P.clear(), true)" style="color:var(--ink4)">ไม่ใช่คุณ? ออกจากระบบบนเครื่องนี้</a></p>`;
+    $('#content').innerHTML = html;
+    const gj = $('#goJourney'); if (gj) gj.onclick = () => { K.LS.set('kliq_journey', token); render(r); window.scrollTo({ top: document.getElementById('jt').offsetTop - 12, behavior: 'smooth' }); };
+    if (reveal) {
+      reveal = false;
+      const box = $('#shuffle'), nm = $('#shName');
+      let i = 0;
+      const t = setInterval(() => { const x = SER[i++ % 5]; box.style.background = x[2]; box.style.color = (x[0] === 'F' || x[0] === 'C') ? '#1A1714' : '#F2F0EC'; nm.textContent = x[1]; }, 140);
+      setTimeout(() => {
+        clearInterval(t);
+        box.style.background = p.series_color; box.style.color = ink; nm.textContent = p.series_name;
+        box.querySelector('.eyebrow').textContent = 'การ์ดของคุณคือ';
+        if (navigator.vibrate) navigator.vibrate([40, 40, 120]);
+        setTimeout(() => { box.classList.add('gone'); K.LS.set('kliq_revealed', token); }, 1300);
+      }, 2400);
+    }
+  }
+
+  load();
+  setInterval(() => { if (!document.hidden) load(); }, 15000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+})();
+</script>
+</body>
+</html>

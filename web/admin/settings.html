@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ตั้งค่า & ทีมงาน | KLIQ Admin</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="light">
+<div class="layout">
+  <nav class="side" id="side" aria-label="เมนูแอดมิน"></nav>
+  <main class="main">
+    <div class="head"><h1>ตั้งค่างาน &amp; ทีมงาน</h1></div>
+    <div class="cols">
+      <form class="lcard" id="sf">
+        <h2>ข้อมูลงาน</h2>
+        <label class="lfield">ชื่องาน<input class="linput" id="event_name"></label>
+        <div class="row">
+          <label class="lfield">จำนวนผู้ร่วมงานสูงสุด<input class="linput" type="number" min="1" id="max_participants"></label>
+          <label class="lfield">โควตาต่อซีรีส์<input class="linput" type="number" min="1" id="series_quota"></label>
+        </div>
+        <div class="row">
+          <label class="lfield">เวลาขั้นต่ำระหว่างแสตมป์ (วินาที)<input class="linput" type="number" min="0" id="min_stamp_interval_sec"></label>
+          <label class="lfield">ข้อความประกาศผล<input class="linput" id="announce_text" placeholder="เช่น ประกาศผลบนเวที 19:00 น."></label>
+        </div>
+        <div class="row">
+          <label class="lfield">เวลานับถอยหลังรอผู้โชคดีขึ้นเวที (วินาที)<input class="linput" type="number" min="10" max="600" id="final_claim_sec"></label>
+        </div>
+        <div class="row">
+          <label class="lfield">ชื่อของที่ระลึกทั่วไป (ทุกคนรับได้)<input class="linput" id="souvenir_basic_name" placeholder="ของที่ระลึกทั่วไป"></label>
+          <label class="lfield">ชื่อของที่ระลึกพิเศษ (เล่นครบทุกฐาน)<input class="linput" id="souvenir_premium_name" placeholder="ของที่ระลึกพิเศษ"></label>
+        </div>
+        <label class="check" style="color:var(--l-ink2)"><input type="checkbox" id="registration_open"> เปิดรับลงทะเบียน</label>
+        <div class="sub" id="hint"></div>
+        <button class="lbtn primary" type="submit">บันทึกการตั้งค่า</button>
+      </form>
+      <section class="lcard">
+        <div class="head"><h2>ทีมงานและสิทธิ์</h2></div>
+        <div class="tablebox"><table><thead><tr><th>รหัส</th><th>ชื่อ</th><th>บทบาท</th><th>สถานะ</th></tr></thead><tbody id="staff"></tbody></table></div>
+        <form id="tf" style="display:flex;flex-direction:column;gap:10px">
+          <b style="font-weight:500">เพิ่ม / แก้ไขทีมงาน</b>
+          <div class="row">
+            <label class="lfield">รหัส<input class="linput" id="t_code" placeholder="STAFF01" required></label>
+            <label class="lfield">ชื่อที่แสดง<input class="linput" id="t_name" placeholder="น้องเอ จุดรับของ"></label>
+          </div>
+          <div class="row">
+            <label class="lfield">บทบาท<select class="linput" id="t_role">
+              <option value="souvenir">ของที่ระลึก – สแกนและมอบของ</option><option value="mc">พิธีกร – จอเวทีและสุ่มรางวัล</option>
+              <option value="register">ลงทะเบียน – ดูรายชื่อ ช่วยค้นหา</option><option value="admin">แอดมิน – ทุกเมนู</option></select></label>
+            <label class="lfield">PIN 6 หลัก<input class="linput" id="t_pin" inputmode="numeric" maxlength="6" placeholder="เว้นว่าง = ไม่เปลี่ยน"></label>
+          </div>
+          <label class="check" style="color:var(--l-ink2)"><input type="checkbox" id="t_active" checked> เปิดใช้งาน (ปิด = ออกจากระบบทันที)</label>
+          <button class="lbtn primary" type="submit">บันทึกทีมงาน</button>
+        </form>
+      </section>
+    </div>
+  </main>
+</div>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+<script src="/admin/admin.js"></script>
+<script>
+(async function () {
+  const { $, rpc, msg, esc, toast } = K;
+  const me = await AdminShell('settings', []);
+  if (!me) return;
+  const ROLE = { admin: 'แอดมิน', souvenir: 'ของที่ระลึก', mc: 'พิธีกร', register: 'ลงทะเบียน' };
+  async function load() {
+    const [st, sf] = await Promise.all([rpc('admin_stats', { p_token: me.token }), rpc('admin_staff_list', { p_token: me.token })]);
+    if (st && st.ok) {
+      const s = st.settings;
+      ['event_name', 'max_participants', 'series_quota', 'min_stamp_interval_sec', 'announce_text', 'final_claim_sec', 'souvenir_basic_name', 'souvenir_premium_name'].forEach(k => $('#' + k).value = s[k]);
+      $('#registration_open').checked = s.registration_open;
+      $('#hint').textContent = 'ตอนนี้ลงทะเบียนแล้ว ' + st.registered + ' คน · 5 ซีรีส์ × โควตา ' + s.series_quota + ' = ' + s.series_quota * 5 + ' ที่' +
+        (s.series_quota * 5 < s.max_participants ? ' (น้อยกว่าจำนวนสูงสุด ควรเพิ่มโควตา)' : '');
+    }
+    if (sf && sf.ok) $('#staff').innerHTML = sf.rows.map(x => `<tr style="cursor:pointer" data-code="${esc(x.code)}" data-name="${esc(x.display_name)}" data-role="${x.role}" data-active="${x.active}">
+      <td style="font-weight:500">${esc(x.code)}</td><td>${esc(x.display_name)}</td><td>${ROLE[x.role]}</td>
+      <td>${!x.active ? '<span class="pill void">ปิด</span>' : x.locked ? '<span class="pill wait">ล็อก (กดบันทึกเพื่อปลด)</span>' : '<span class="pill pre">ใช้งาน</span>'}</td></tr>`).join('');
+  }
+  $('#staff').onclick = e => { const tr = e.target.closest('tr'); if (!tr) return;
+    $('#t_code').value = tr.dataset.code; $('#t_name').value = tr.dataset.name; $('#t_role').value = tr.dataset.role;
+    $('#t_active').checked = tr.dataset.active === 'true'; $('#t_pin').value = ''; $('#t_pin').focus(); };
+  $('#sf').onsubmit = async e => {
+    e.preventDefault();
+    const p = { event_name: $('#event_name').value, max_participants: +$('#max_participants').value, series_quota: +$('#series_quota').value,
+      min_stamp_interval_sec: +$('#min_stamp_interval_sec').value, final_claim_sec: +$('#final_claim_sec').value || 30, souvenir_basic_name: $('#souvenir_basic_name').value, souvenir_premium_name: $('#souvenir_premium_name').value, announce_text: $('#announce_text').value, registration_open: $('#registration_open').checked };
+    const r = await rpc('admin_settings_save', { p_token: me.token, p });
+    toast(r && r.ok ? 'บันทึกการตั้งค่าแล้ว' : msg(r), r && r.ok ? 'ok' : 'err'); load();
+  };
+  $('#tf').onsubmit = async e => {
+    e.preventDefault();
+    const r = await rpc('admin_staff_save', { p_token: me.token, p_code: $('#t_code').value, p_name: $('#t_name').value, p_role: $('#t_role').value,
+      p_pin: $('#t_pin').value || null, p_active: $('#t_active').checked });
+    toast(r && r.ok ? 'บันทึกทีมงานแล้ว' : msg(r), r && r.ok ? 'ok' : 'err');
+    if (r && r.ok) { $('#tf').reset(); $('#t_active').checked = true; }
+    load();
+  };
+  load();
+})();
+</script>
+</body>
+</html>

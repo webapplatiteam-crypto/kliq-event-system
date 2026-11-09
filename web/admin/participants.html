@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ผู้ร่วมงาน | KLIQ Admin</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="light">
+<div class="layout">
+  <nav class="side" id="side" aria-label="เมนูแอดมิน"></nav>
+  <main class="main">
+    <div class="head">
+      <div><h1>ผู้ร่วมงาน</h1><div class="sub" id="total"></div></div>
+      <div class="row adminonly" hidden>
+        <button class="lbtn" id="imp">นำเข้ารายชื่อล่วงหน้า (CSV)</button>
+        <button class="lbtn" id="exp">Export CSV</button>
+      </div>
+    </div>
+
+    <section class="lcard adminonly" id="impBox" hidden>
+      <h2>นำเข้ารายชื่อลงทะเบียนล่วงหน้า</h2>
+      <p class="sub" style="margin:0">ไฟล์ CSV (บันทึกจาก Excel เป็น "CSV UTF-8") คอลัมน์: <b>phone, name, email, company</b> · การ์ดซีรีส์ระบบจะสุ่มให้ตอนลูกค้าลงทะเบียนหน้างาน</p>
+      <div class="row">
+        <label class="lfield">เลือกไฟล์<input class="linput" type="file" id="file" accept=".csv,text/csv" style="padding-top:8px"></label>
+        <label class="check" style="color:var(--l-ink2);flex:1 1 220px"><input type="checkbox" id="replace"> ลบรายชื่อล่วงหน้าเดิมทั้งหมดก่อนนำเข้า</label>
+        <button class="lbtn" id="tpl" type="button">ดาวน์โหลดไฟล์ตัวอย่าง</button>
+        <button class="lbtn primary" id="doImp" type="button">นำเข้า</button>
+      </div>
+      <div id="impRes"></div>
+    </section>
+
+    <div class="row" style="align-items:center">
+      <label class="lfield" style="flex:1 1 280px"><span class="sr-only">ค้นหา</span>
+        <input class="linput" id="q" type="search" placeholder="ค้นหาชื่อ เบอร์ บริษัท รหัส PP หรือหมายเลขลุ้นโชค"></label>
+      <div class="chips" id="filters"></div>
+    </div>
+    <div class="tablebox"><table>
+      <thead><tr><th>รหัส</th><th>ชื่อ - นามสกุล</th><th>เบอร์โทร</th><th>บริษัท</th><th>ประเภท</th><th>ลุ้นโชค</th><th>Passport</th><th>ของที่ระลึก</th><th>ลงทะเบียน</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="9">กำลังโหลด…</td></tr></tbody></table></div>
+    <div class="head"><span class="sub" id="pageInfo"></span>
+      <div class="row"><button class="lbtn" id="prev">ก่อนหน้า</button><button class="lbtn" id="next">ถัดไป</button></div></div>
+  </main>
+</div>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+<script src="/admin/admin.js"></script>
+<script>
+(async function () {
+  const { $, $$, rpc, msg, esc, fmtDateTime, fmtTime, toast, busy, toCSV, parseCSV, download } = K;
+  const me = await AdminShell('participants', ['register', 'souvenir']);
+  if (!me) return;
+  if (me.role === 'admin') $$('.adminonly').forEach(e => { if (e.id !== 'impBox') e.hidden = false; });
+  const PAGE = 50;
+  let filter = 'all', offset = 0, total = 0, timer;
+  const F = [['all', 'ทั้งหมด'], ['pre', 'ล่วงหน้า'], ['walkin', 'Walk-in'], ['completed', 'ครบทุกฐาน'], ['waiting', 'ครบฐาน รอของพิเศษ'], ['souvenir', 'รับของแล้ว']];
+  $('#filters').innerHTML = F.map(f => `<button class="chip" type="button" data-f="${f[0]}" aria-pressed="${f[0] === filter}">${f[1]}</button>`).join('');
+  $('#filters').onclick = e => { const b = e.target.closest('button'); if (!b) return; filter = b.dataset.f; offset = 0;
+    $$('#filters .chip').forEach(x => x.setAttribute('aria-pressed', x === b)); load(); };
+  $('#q').oninput = () => { clearTimeout(timer); timer = setTimeout(() => { offset = 0; load(); }, 300); };
+  $('#prev').onclick = () => { offset = Math.max(0, offset - PAGE); load(); };
+  $('#next').onclick = () => { if (offset + PAGE < total) { offset += PAGE; load(); } };
+
+  async function load() {
+    const r = await rpc('admin_participants', { p_token: me.token, p_search: $('#q').value, p_filter: filter, p_limit: PAGE, p_offset: offset });
+    if (!r || !r.ok) { $('#rows').innerHTML = `<tr><td colspan="9">${esc(msg(r))}</td></tr>`; return; }
+    total = r.total;
+    $('#total').textContent = 'พบ ' + r.total + ' รายการ';
+    $('#pageInfo').textContent = r.total ? `แสดง ${offset + 1}–${Math.min(offset + PAGE, r.total)} จาก ${r.total}` : '';
+    $('#rows').innerHTML = r.rows.length ? r.rows.map(p => `<tr>
+      <td class="sub">${esc(p.ref_code)}</td><td style="font-weight:500">${esc(p.name)}</td><td>${esc(p.phone)}</td><td>${esc(p.company || '')}</td>
+      <td><span class="pill ${p.source === 'pre' ? 'pre' : 'walk'}">${p.source === 'pre' ? 'ล่วงหน้า' : 'Walk-in'}</span></td>
+      <td style="letter-spacing:1px">${esc(p.ticket_no)}</td><td>${p.stamps}${p.completed_at ? ' ✓' : ''}</td>
+      <td>${p.souvenir_at ? '<span class="pill done">รับ' + (p.souvenir_tier === 'premium' ? 'พิเศษ' : 'ทั่วไป') + ' ' + fmtTime(p.souvenir_at) + '</span>' : ''}${p.completed_at && p.souvenir_tier !== 'premium' ? ' <span class="pill wait">รอของพิเศษ</span>' : ''}${!p.souvenir_at && !p.completed_at ? '—' : ''}</td>
+      <td class="sub">${fmtDateTime(p.created_at)}</td></tr>`).join('') : '<tr><td colspan="9" class="sub">ไม่พบรายการ</td></tr>';
+  }
+  load();
+  setInterval(() => { if (!document.hidden && !$('#q').value) load(); }, 20000);
+
+  if (me.role !== 'admin') return;
+  $('#exp').onclick = async () => {
+    busy($('#exp'), true);
+    const r = await rpc('admin_export', { p_token: me.token });
+    busy($('#exp'), false);
+    if (!r || !r.ok) { toast(msg(r), 'err'); return; }
+    download('kliq-participants-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '') + '.csv', toCSV(r.rows, [
+      { key: 'ref_code', label: 'รหัส' }, { key: 'ticket_no', label: 'หมายเลขลุ้นโชค' }, { key: 'name', label: 'ชื่อ' },
+      { key: 'phone', label: 'เบอร์โทร' }, { key: 'email', label: 'อีเมล' }, { key: 'company', label: 'บริษัท' },
+      { key: 'series', label: 'ซีรีส์' }, { key: 'source', label: 'ประเภท' }, { get: x => fmtDateTime(x.registered_at), label: 'ลงทะเบียน' },
+      { key: 'stamps', label: 'จำนวนฐาน' }, { get: x => fmtDateTime(x.completed_at), label: 'ครบทุกฐาน' },
+      { get: x => fmtDateTime(x.souvenir_at), label: 'รับของที่ระลึก' }, { get: x => x.souvenir_tier === 'premium' ? 'พิเศษ' : x.souvenir_tier === 'basic' ? 'ทั่วไป' : '', label: 'แบบของที่ระลึก' }, { key: 'prize', label: 'รางวัล' }]));
+  };
+  $('#imp').onclick = () => { $('#impBox').hidden = !$('#impBox').hidden; };
+  $('#tpl').onclick = () => download('kliq-prereg-template.csv', '﻿phone,name,email,company\r\n0812345678,สมชาย ใจดี,somchai@email.com,บริษัท ตัวอย่าง จำกัด\r\n');
+  $('#doImp').onclick = async () => {
+    const f = $('#file').files[0];
+    if (!f) { toast('กรุณาเลือกไฟล์ CSV', 'err'); return; }
+    const rows = parseCSV(await f.text());
+    if (rows.length < 2) { toast('ไม่พบข้อมูลในไฟล์', 'err'); return; }
+    const head = rows[0].map(h => h.trim().toLowerCase());
+    const idx = n => head.findIndex(h => n.some(x => h === x));
+    const ci = { phone: idx(['phone', 'เบอร์', 'เบอร์โทร', 'โทรศัพท์', 'mobile']), name: idx(['name', 'ชื่อ', 'ชื่อ-นามสกุล', 'ชื่อ - นามสกุล', 'full name']),
+      email: idx(['email', 'อีเมล', 'e-mail']), company: idx(['company', 'บริษัท', 'ร้านค้า']), series: idx(['series', 'ซีรีส์', 'sku']) };
+    if (ci.phone < 0 || ci.name < 0) { toast('ต้องมีคอลัมน์ phone และ name', 'err'); return; }
+    const data = rows.slice(1).map(r => ({ phone: r[ci.phone], name: r[ci.name], email: ci.email >= 0 ? r[ci.email] : '', company: ci.company >= 0 ? r[ci.company] : '', series: ci.series >= 0 ? r[ci.series] : '' }));
+    if ($('#replace').checked && !confirm('ลบรายชื่อล่วงหน้าเดิมทั้งหมด แล้วแทนด้วยไฟล์นี้?')) return;
+    busy($('#doImp'), true, 'กำลังนำเข้า…');
+    let ok = 0, bad = [];
+    for (let i = 0; i < data.length; i += 500) {
+      const r = await rpc('admin_import_prereg', { p_token: me.token, p_rows: data.slice(i, i + 500), p_replace: $('#replace').checked && i === 0 });
+      if (!r || !r.ok) { toast(msg(r), 'err'); break; }
+      ok += r.imported; bad = bad.concat(r.rejected);
+    }
+    busy($('#doImp'), false);
+    $('#impRes').innerHTML = `<div class="lnotice ${bad.length ? '' : 'ok'}">นำเข้าสำเร็จ ${ok} รายการ${bad.length ? ' · ข้ามไป ' + bad.length + ' รายการ (เบอร์หรือชื่อไม่ถูกต้อง): ' + bad.slice(0, 5).map(b => esc(b.phone || '-')).join(', ') : ''}</div>`;
+    load();
+  };
+})();
+</script>
+</body>
+</html>
