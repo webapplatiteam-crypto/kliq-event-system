@@ -149,6 +149,10 @@
     while (true) { els.forEach(e => e.classList.remove('spot')); els[i].classList.add('spot'); tick(); t += d; d = 70 + Math.pow(t / total, 2.2) * 620; if (t >= total && i === ti) break; await sleep(d); i = (i + 1) % els.length; }
     await sleep(500);
   }
+  // ช่วงลุ้น: ไฟหยุดที่การ์ดแล้ว ค้างไว้ให้พิธีกรพูด (ค่าเริ่มต้น 15 วิ) · กด Space หรือ Enter เพื่อเปิดผลก่อนเวลา
+  const HOLD_MS = 15000; let holdResolve = null;
+  function hold(ms) { return new Promise(res => { holdResolve = res; const t = setTimeout(() => { holdResolve = null; res(); }, ms); holdResolve._t = t; }); }
+  function releaseHold() { if (holdResolve) { clearTimeout(holdResolve._t); const r = holdResolve; holdResolve = null; r(); return true; } return false; }
   async function eliminate(el, text) { el.classList.remove('spot'); el.classList.add('flash'); await sleep(120); el.classList.add('shake'); thud(); stamp(el, text || 'OUT'); await sleep(700); el.classList.remove('shake'); el.classList.add('out'); await sleep(900); }
 
   // ---------- วงล้อ ----------
@@ -306,16 +310,18 @@
       const live = $$('.scard:not(.out)'), target = live.find(e => e.dataset.code === gone.code);
       const last = next.phase !== 'cut';
       setHead(last ? 'การ์ดใบสุดท้ายที่จะถูกคัดออก…' : 'กำลังคัดการ์ดออก…', true); drumroll(last ? 4600 : 3800); await roulette(live, target, last ? 4600 : 3800);
+      setHead('การ์ด ' + gone.name + ' … เข้ารอบ หรือ ตกรอบ?  (กด Space เปิดผล)', true); await hold(HOLD_MS);   // ค้างให้พิธีกรพูด
       setHead('การ์ด ' + gone.name + ' ถูกคัดออก!'); await eliminate(target, 'OUT');
-      if (last) { const rest = $$('.scard:not(.out)'); rest.forEach(e => e.classList.add('win')); ding(); confetti(160, true);
-        setHead('เหลือ ' + rest.length + ' การ์ด: ' + next.series.filter(s => !s.out).map(s => s.name).join(' · ') + ' · ทุกใบมีรางวัล!'); await sleep(2600); }
+      if (last) { const restS = next.series.filter(s => !s.out); $$('.scard:not(.out)').forEach(e => e.classList.add('win')); ding(); confetti(160, true);
+        setHead('เหลือ ' + restS.length + ' การ์ด: ' + restS.map(s => s.name).join(' · ') + ' · ทุกใบมีรางวัล!'); await sleep(2600); }
       return;
     }
     if (prev.phase === 'reveal' && next.next_card) {         // เปิดการ์ดของรางวัลนี้
       const r = next.next_rank;
       const live = $$('.scard:not(.out):not(.ranked)'), target = live.find(e => e.dataset.code === next.next_card);
       const nm = next.series.find(s => s.code === next.next_card).name;
-      if (live.length > 1) { setHead(`รางวัลที่ ${r} · ${prizeName(r)} · การ์ดใบไหน?`, true); drumroll(3600); await roulette(live, target, 3600); }
+      if (live.length > 1) { setHead(`รางวัลที่ ${r} · ${prizeName(r)} · การ์ดใบไหน?`, true); drumroll(3600); await roulette(live, target, 3600);
+        setHead(`การ์ด ${nm} … ได้รางวัลที่ ${r} หรือไม่?  (กด Space เปิดผล)`, true); await hold(HOLD_MS); }
       else { target.classList.add('spot'); await sleep(600); }
       target.classList.remove('spot'); target.classList.add('flash', 'pick'); stamp(target, 'รางวัลที่ ' + r, true); ding(); confetti(120);
       setHead(`รางวัลที่ ${r} · ${prizeName(r)} ไปที่ผู้ถือการ์ด ${nm}!`); await sleep(2200); return;
@@ -328,11 +334,12 @@
     }
   }
 
-  $('#go').onclick = step;
+  $('#go').onclick = () => { if (!releaseHold()) step(); };
   $('#fs').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
   document.addEventListener('keydown', e => {
     const modalOpen = !$('#modal').hidden;
     if (modalOpen) { if (e.key === 'Enter') { e.preventDefault(); claim(true); } if (e.key === 'n' || e.key === 'N') claim(false); return; }
+    if ((e.code === 'Space' || e.key === 'Enter') && e.target === document.body && releaseHold()) { e.preventDefault(); return; }
     if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); step(); }
     if (e.key === 'f' || e.key === 'F') $('#fs').click();
     if (e.key === 'm' || e.key === 'M') $('#snd').click();
