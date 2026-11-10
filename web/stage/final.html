@@ -204,7 +204,7 @@
       go.textContent = 'คัดการ์ดออก 1 ใบ'; go.disabled = false; return;
     }
     // รอบรางวัล: การ์ดแถวบน + บันไดรางวัล + วงล้อ
-    const card = draw.next_card && draw.series.find(s => s.code === draw.next_card);
+    const card = (draw.next_card && draw.series.find(s => s.code === draw.next_card)) || { name: '' };
     setHead(draw.done ? 'ขอแสดงความยินดีกับผู้โชคดีทุกท่าน!'
       : ph === 'reveal' ? `รางวัลที่ ${r} · ${prizeName(r)} · เปิดการ์ด 1 ใน ${live - ranks.filter(k => k > r).length} ใบที่เหลือ`
       : `รางวัลที่ ${r} · ${prizeName(r)} · ผู้ถือการ์ด ${card.name} ${draw.pool_left} ท่านลุ้น`);
@@ -298,7 +298,7 @@
       draw = r.draw; working = false; render(); return;
     }
     working = false; $('#go').disabled = false;
-    toast(r && r.code === 'FINAL_DONE' ? 'รอบชิงจบไปแล้ว' : r && r.code === 'NO_FINAL_PRIZE' ? 'ยังไม่ได้ตั้งรางวัลรอบชิงอันดับ ' + (r.rank || 1) + ' ในหน้าแอดมิน'
+    toast(r && r.code === 'FINAL_DONE' ? 'รางวัลรอบชิงทุกรางวัลมีผู้รับแล้ว · ถ้าต้องการเล่นใหม่ ให้แอดมินยกเลิกสิทธิ์ หรือล้างข้อมูลซ้อมก่อน' : r && r.code === 'NO_FINAL_PRIZE' ? 'ยังไม่ได้ตั้งรางวัลรอบชิงอันดับ ' + (r.rank || 1) + ' ในหน้าแอดมิน'
         : r && r.code === 'NOT_ENOUGH' ? (draw ? 'ผู้ถือการ์ดนี้ถูกเรียกครบทุกคนแล้ว' : 'ยังไม่มีผู้มีสิทธิ์ลุ้น · ต้องมีผู้ลงทะเบียนอย่างน้อย 1 คน (และยังไม่เลยเวลาตัดยอด) ก่อนเริ่มรอบชิง') : r && r.code === 'PENDING' ? 'กรุณายืนยันผู้โชคดีก่อน' : msg(r), 'err');
   }
 

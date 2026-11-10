@@ -156,8 +156,7 @@ create table if not exists grand_draws (
 
 -- v3: คัดการ์ดออกทีละใบจนเหลือเท่าจำนวนรางวัล (3 ใบ) แล้วเปิดการ์ดทีละใบให้รางวัลที่ 3 → 2 → 1
 --     หมุนวงล้อสุ่มคนจากผู้ถือการ์ดใบนั้น (แต่ละรางวัลจึงคนละ SKU) ผู้ถูกเรียกต้องยืนยันว่าอยู่ในงาน ไม่อยู่ = สุ่มใหม่
-drop table if exists final_draws cascade;
-create table final_draws (
+create table if not exists final_draws (
   id                  serial primary key,
   series_order        text[] not null,          -- ตำแหน่ง 1..(5-n) = ลำดับคัดออก · ตำแหน่ง 6-r = การ์ดของรางวัลที่ r
   pool_count          int not null,             -- (ไม่ใช้แล้ว เก็บไว้เพื่อความเข้ากันได้)
@@ -169,6 +168,12 @@ create table final_draws (
   created_at          timestamptz not null default now(),
   created_by          uuid references staff(id)
 );
+-- อัปเกรดจากเวอร์ชันเก่า (ตารางเดิมมี top5/top3) โดยไม่ลบข้อมูล
+alter table final_draws drop column if exists top5, drop column if exists top3;
+alter table final_draws add column if not exists pending_participant uuid references participants(id),
+                        add column if not exists pending_rank int,
+                        add column if not exists pending_at timestamptz;
+alter table final_draws alter column pool_count set default 0;
 
 create table if not exists audit_log (
   id         bigserial primary key,
@@ -840,6 +845,12 @@ begin
   end if;
   if not exists (select 1 from prizes where kind = 'final' and rank = 1) then
     return jsonb_build_object('ok', false, 'code', 'NO_FINAL_PRIZE');
+  end if;
+  -- ทุกรางวัลมีผู้รับแล้ว (เช่น เล่นจบแล้วแต่ตารางรอบถูกล้าง) → ไม่เปิดรอบใหม่ ต้องยกเลิกสิทธิ์หรือล้างข้อมูลก่อน
+  if not exists (select r from unnest(_final_ranks()) r
+                  where not exists (select 1 from draw_results d join prizes z on z.id = d.prize_id
+                                     where z.kind = 'final' and z.rank = r and not d.voided)) then
+    return jsonb_build_object('ok', false, 'code', 'FINAL_DONE');
   end if;
   n := coalesce(array_length(_final_ranks(), 1), 1);
   -- ถ้าแอดมินกำหนดลำดับการ์ดไว้ล่วงหน้า (ครบ 5 ใบ ไม่ซ้ำ รหัสถูกต้อง) ใช้ลำดับนั้น
