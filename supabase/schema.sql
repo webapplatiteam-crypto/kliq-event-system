@@ -20,6 +20,7 @@ create table if not exists settings (
   cutoff_at              timestamptz,
   announce_text          text not null default 'ประกาศผลบนเวที',
   final_claim_sec        int  not null default 30 check (final_claim_sec between 10 and 600),
+  final_order            text[],                 -- กำหนดลำดับการ์ดล่วงหน้า (ไม่บังคับ): ตำแหน่ง 1..(5-n) = คัดออก, ตำแหน่ง 6-r = รางวัลที่ r · null = สุ่ม
   souvenir_basic_name    text not null default 'ของที่ระลึกทั่วไป',
   souvenir_premium_name  text not null default 'ของที่ระลึกพิเศษ (เล่นครบทุกฐาน)',
   updated_at             timestamptz not null default now()
@@ -120,6 +121,7 @@ alter table prizes add column if not exists rank int;
 alter table settings add column if not exists final_claim_sec int not null default 30;
 alter table settings add column if not exists souvenir_basic_name text not null default 'ของที่ระลึกทั่วไป';
 alter table settings add column if not exists souvenir_premium_name text not null default 'ของที่ระลึกพิเศษ (เล่นครบทุกฐาน)';
+alter table settings add column if not exists final_order text[];
 alter table participants add column if not exists souvenir_tier text check (souvenir_tier in ('basic','premium'));
 alter table participants add column if not exists souvenir_upgraded_at timestamptz;
 alter table prizes drop constraint if exists prizes_kind_check;
@@ -632,6 +634,10 @@ begin
     final_claim_sec        = coalesce((p->>'final_claim_sec')::int, final_claim_sec),
     souvenir_basic_name    = coalesce(nullif(trim(p->>'souvenir_basic_name'), ''), souvenir_basic_name),
     souvenir_premium_name  = coalesce(nullif(trim(p->>'souvenir_premium_name'), ''), souvenir_premium_name),
+    final_order            = case when p ? 'final_order' then
+                               (case when jsonb_typeof(p->'final_order') = 'array' and jsonb_array_length(p->'final_order') = 5
+                                     then (select array_agg(x) from jsonb_array_elements_text(p->'final_order') x) end)
+                             else final_order end,
     updated_at             = now()
   where id = 1;
   insert into audit_log (staff_id, action, detail) values (s.id, 'settings', p);
@@ -836,6 +842,15 @@ begin
     return jsonb_build_object('ok', false, 'code', 'NO_FINAL_PRIZE');
   end if;
   n := coalesce(array_length(_final_ranks(), 1), 1);
+  -- ถ้าแอดมินกำหนดลำดับการ์ดไว้ล่วงหน้า (ครบ 5 ใบ ไม่ซ้ำ รหัสถูกต้อง) ใช้ลำดับนั้น
+  select final_order into ord from settings where id = 1;
+  if ord is not null and array_length(ord, 1) = 5
+     and (select count(distinct x) from unnest(ord) x) = 5
+     and not exists (select 1 from unnest(ord) x where x not in (select code from series)) then
+    insert into final_draws (series_order, pool_count, created_by) values (ord, (select count(*) from _eligible()), s.id) returning * into g;
+    insert into audit_log (staff_id, action, detail) values (s.id, 'final_create', jsonb_build_object('draw', g.id, 'order', ord, 'locked', true));
+    return final_state(p_token, g.id);
+  end if;
   -- สุ่มลำดับการ์ด โดยพยายามให้การ์ดที่จะได้รางวัล (ตำแหน่งท้าย n ใบ) มีผู้มีสิทธิ์อย่างน้อย 1 คน
   loop
     select array_agg(code order by random()) into ord from series;

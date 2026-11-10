@@ -29,6 +29,16 @@
         <div id="elig"></div>
       </section>
       <section class="lcard">
+        <h2>กำหนดลำดับการ์ดล่วงหน้า (ไม่บังคับ)</h2>
+        <div class="sub">ถ้าตั้งไว้ จอเวทีจะคัดการ์ดและมอบรางวัลตามนี้แทนการสุ่ม (ส่วน "คน" ในแต่ละการ์ดยังสุ่มจากวงล้อ) · ต้องตั้งก่อนกด "เริ่มรอบชิง" · ปล่อยเป็น "สุ่ม" ทุกใบ = สุ่มทั้งหมด</div>
+        <div id="plan" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="lbtn primary" id="savePlan">บันทึกลำดับ</button>
+          <button class="lbtn" id="clearPlan">ล้าง (กลับไปสุ่ม)</button>
+          <span id="planStatus" class="sub"></span>
+        </div>
+      </section>
+      <section class="lcard">
         <div class="head"><h2>รางวัลรอบชิง (3 รางวัล)</h2><button class="lbtn" id="add" hidden>+ เพิ่มรางวัล</button></div>
         <div id="prizes" style="display:flex;flex-direction:column;gap:10px"></div>
         <div class="sub">คัดการ์ด 5 → 3 แล้วเปิดการ์ดทีละใบให้รางวัลที่ 3 → 2 → 1 หมุนวงล้อจากผู้ถือการ์ดนั้น (แต่ละรางวัลคนละซีรีส์) · รูปและรายละเอียดจะขึ้นบนจอเวที ป๊อปอัปผู้โชคดี และมือถือลูกค้า</div>
@@ -126,10 +136,30 @@
     { key: 'prize', label: 'รางวัล' }, { key: 'ticket_no', label: 'หมายเลข' }, { key: 'name', label: 'ชื่อ' }, { key: 'phone', label: 'เบอร์' },
     { key: 'series_name', label: 'ซีรีส์' }, { get: x => fmtDateTime(x.drawn_at), label: 'เวลา' }]));
 
+  // ---------- ลำดับการ์ดล่วงหน้า ----------
+  const ROLES = [['', 'สุ่ม'], ['out1', 'คัดออกใบที่ 1'], ['out2', 'คัดออกใบที่ 2'], ['r3', 'รางวัลที่ 3'], ['r2', 'รางวัลที่ 2'], ['r1', 'รางวัลที่ 1']];
+  const ORDER_SLOT = { out1: 0, out2: 1, r3: 2, r2: 3, r1: 4 };    // ตำแหน่งใน series_order (1..2 = ออก, 6-r = รางวัลที่ r)
+  function renderPlan(order, bySeries) {
+    const roleOf = code => { if (!order) return ''; const i = order.indexOf(code); return i < 0 ? '' : Object.keys(ORDER_SLOT).find(k => ORDER_SLOT[k] === i) || ''; };
+    const SER = [['U', 'UNO'], ['I', 'IKON'], ['F', 'FORMA'], ['N', 'NOVA'], ['C', 'CASA']];
+    $('#plan').innerHTML = SER.map(([c, n]) => { const cnt = (bySeries.find(b => b.code === c) || {}).count; return `<label class="lfield">${n}${cnt != null ? ' <span class="sub">(' + cnt + ' คน)</span>' : ''}
+      <select class="linput" data-plan="${c}">${ROLES.map(([v, t]) => `<option value="${v}" ${roleOf(c) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`; }).join('');
+    $('#planStatus').textContent = order && order.length === 5 ? 'ล็อกไว้: ' + order.map((c, i) => (SER.find(x => x[0] === c) || [c, c])[1] + ' ' + ['ออก 1', 'ออก 2', 'ที่ 3', 'ที่ 2', 'ที่ 1'][i]).join(' · ') : 'ยังไม่ได้ล็อก (สุ่มทั้งหมด)';
+  }
+  $('#savePlan').onclick = async () => {
+    const sel = [...document.querySelectorAll('[data-plan]')]; const order = new Array(5).fill(null); const used = {};
+    for (const el of sel) { const v = el.value; if (!v) continue; if (used[v]) { toast('ตั้ง "' + ROLES.find(r => r[0] === v)[1] + '" ซ้ำ 2 ใบ', 'err'); return; } used[v] = 1; order[ORDER_SLOT[v]] = el.dataset.plan; }
+    if (order.some(x => !x)) { toast('ต้องกำหนดให้ครบทั้ง 5 ใบ (คัดออก 2 ใบ + รางวัลที่ 3, 2, 1) หรือกด "ล้าง" เพื่อสุ่ม', 'err'); return; }
+    const r = await rpc('admin_settings_save', { p_token: me.token, p: { final_order: order } });
+    toast(r && r.ok ? 'บันทึกลำดับการ์ดแล้ว · มีผลเมื่อกด "เริ่มรอบชิง" ครั้งถัดไป' : msg(r), r && r.ok ? 'ok' : 'err'); load();
+  };
+  $('#clearPlan').onclick = async () => { const r = await rpc('admin_settings_save', { p_token: me.token, p: { final_order: null } }); toast(r && r.ok ? 'กลับไปสุ่มทั้งหมดแล้ว' : msg(r), r && r.ok ? 'ok' : 'err'); load(); };
+
   async function load() {
     const [st, pz, el, rs] = await Promise.all([rpc('admin_stats', { p_token: me.token }), rpc('admin_prizes', { p_token: me.token }),
       rpc('draw_eligible_count', { p_token: me.token }), rpc('draw_results_list', { p_token: me.token })]);
     if (st && st.ok) $('#cutoff').value = toLocal(st.settings.cutoff_at);
+    if (st && st.ok) renderPlan(st.settings.final_order, el && el.ok ? el.by_series : []);
     if (el && el.ok) $('#elig').innerHTML = `<div class="lnotice ok">ผู้มีสิทธิ์ลุ้นตอนนี้ <b>${el.eligible}</b> คน · ${el.by_series.map(s => esc(s.name) + ' ' + s.count).join(' · ')}</div>`;
     if (pz && pz.ok) { const fin = pz.rows.filter(z => z.kind === 'final');
       $('#prizes').innerHTML = [1, 2, 3].map(r => { const z = fin.find(x => x.rank === r); return z ? prizeRow(z) : prizeRow(null).replace('<option value="' + r + '" >', '<option value="' + r + '" selected>'); }).join(''); }

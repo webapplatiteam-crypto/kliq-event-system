@@ -1,7 +1,7 @@
 /* KLIQ DEMO backend: re-implements every database function in the browser.
    Data lives in this viewer's localStorage only. Not for production. */
 (function () {
-  const KEY = 'kliq_demo_db_v10';
+  const KEY = 'kliq_demo_db_v11';
   const SERIES = [
     { code: 'U', name: 'UNO', color: '#808A70', tagline: 'KLIQ WITH SIMPLIFY', sort: 1 },
     { code: 'I', name: 'IKON', color: '#15435A', tagline: 'KLIQ YOUR STYLE', sort: 2 },
@@ -26,7 +26,7 @@
 
   function fresh() {
     const db = {
-      settings: { id: 1, event_name: 'KLIQ Grand Launch Experience', max_participants: 400, series_quota: 80, min_stamp_interval_sec: 0, final_claim_sec: 30, souvenir_basic_name: 'ของที่ระลึกทั่วไป', souvenir_premium_name: 'ของที่ระลึกพิเศษ (เล่นครบทุกฐาน)',
+      settings: { id: 1, event_name: 'KLIQ Grand Launch Experience', max_participants: 400, series_quota: 80, min_stamp_interval_sec: 0, final_claim_sec: 30, final_order: null, souvenir_basic_name: 'ของที่ระลึกทั่วไป', souvenir_premium_name: 'ของที่ระลึกพิเศษ (เล่นครบทุกฐาน)',
         registration_open: true, cutoff_at: null, announce_text: 'ประกาศผลบนเวที 19:00 น.', updated_at: now() },
       series: SERIES.map(s => Object.assign({ next_no: 1 }, s)),
       prereg: [], participants: [], stamps: [], staff: [], sessions: [], prizes: [], results: [], finals: [], audit: [],
@@ -177,6 +177,7 @@
     admin_stations: (db, a) => { const s = staffFrom(db, a.p_token, []); if (!s) return AUTH; return { ok: true, rows: db.stations.slice().sort((x, y) => x.sort - y.sort).map(st => ({ id: st.id, name: st.name, qr_token: st.qr_token, active: st.active, sort: st.sort, count: db.stamps.filter(x => x.station_id === st.id).length })) }; },
     admin_station_save: (db, a) => { const s = staffFrom(db, a.p_token, []); if (!s) return AUTH; const st = db.stations.find(x => x.id === a.p_id); if (st) { if (a.p_name && a.p_name.trim()) st.name = a.p_name.trim(); if (a.p_active != null) st.active = a.p_active; if (a.p_rotate) st.qr_token = 'DEMO-ST' + st.id + '-' + tok(6); } return { ok: true }; },
     admin_settings_save: (db, a) => { const s = staffFrom(db, a.p_token, []); if (!s) return AUTH; const p = a.p || {}, c = db.settings;
+      if ('final_order' in p) c.final_order = Array.isArray(p.final_order) && p.final_order.length === 5 ? p.final_order : null;
       ['event_name', 'announce_text', 'souvenir_basic_name', 'souvenir_premium_name'].forEach(k => { if (p[k] != null && String(p[k]).trim()) c[k] = p[k]; }); ['max_participants', 'series_quota', 'min_stamp_interval_sec', 'final_claim_sec'].forEach(k => { if (p[k] != null && !isNaN(+p[k])) c[k] = +p[k]; });
       if (p.registration_open != null) c.registration_open = !!p.registration_open; if ('cutoff_at' in p) c.cutoff_at = p.cutoff_at ? new Date(p.cutoff_at).toISOString() : null; c.updated_at = now(); return { ok: true }; },
     admin_staff_list: (db, a) => { const s = staffFrom(db, a.p_token, []); if (!s) return AUTH; return { ok: true, rows: db.staff.map(x => ({ code: x.code, display_name: x.display_name, role: x.role, active: x.active, locked: !!(x.locked_until && new Date(x.locked_until) > new Date()) })) }; },
@@ -200,7 +201,9 @@
       if (!finalPrize(db, 1)) return { ok: false, code: 'NO_FINAL_PRIZE' };
       const e = eligible(db); if (!e.length) return { ok: false, code: 'NOT_ENOUGH' };
       const n = finalRanks(db).length || 1; let order, tries = 0;
-      do { order = shuffle(db.series.map(x => x.code)); tries++; } while (tries < 50 && !order.slice(5 - n).every(c => e.some(p => p.series_code === c)));
+      const lock = db.settings.final_order, codes = db.series.map(x => x.code);
+      if (lock && lock.length === 5 && new Set(lock).size === 5 && lock.every(c => codes.includes(c))) order = lock.slice();
+      else do { order = shuffle(codes); tries++; } while (tries < 50 && !order.slice(5 - n).every(c => e.some(p => p.series_code === c)));
       const g = { id: db.finalSeq++, series_order: order, pool_count: e.length, step: 0, pending_participant: null, pending_rank: null, pending_at: null, done: false, created_at: now() };
       db.finals.push(g); return FN.final_state(db, { p_token: a.p_token, p_draw_id: g.id }); },
     final_next: (db, a) => { const s = staffFrom(db, a.p_token, ['mc']); if (!s) return AUTH; const g = db.finals.find(x => x.id === a.p_draw_id); if (!g) return { ok: false, code: 'NOT_FOUND' }; if (g.done) return FN.final_state(db, { p_token: a.p_token, p_draw_id: g.id });

@@ -207,6 +207,9 @@ normal = [p for p in rpc('admin_prizes', MC)['rows'] if p['kind'] == 'normal'][0
 st0 = rpc('final_state', MC)
 check('no final draw yet', st0.get('ok') and st0['draw'] is None and len(st0['prizes']) == 3 and st0['claim_sec'] == 30, st0)
 check('final_state prizes carry image', [p for p in st0['prizes'] if p['rank'] == 1][0]['image'] == IMG)
+check('lock card order', rpc('admin_settings_save', A, {'final_order': ['U', 'N', 'I', 'F', 'C']}).get('ok') and rpc('admin_stats', A)['settings']['final_order'] == ['U', 'N', 'I', 'F', 'C'])
+check('bad lock (4 items) ignored', rpc('admin_settings_save', A, {'final_order': ['U', 'N', 'I', 'F']}).get('ok') and rpc('admin_stats', A)['settings']['final_order'] is None)
+check('lock again', rpc('admin_settings_save', A, {'final_order': ['U', 'N', 'I', 'F', 'C']}).get('ok'))
 f = rpc('final_create', MC)['draw']
 check('final created: 5 cards all in play, 2 cuts to go', f['step'] == 0 and f['cuts'] == 2 and f['phase'] == 'cut' and len(f['series']) == 5 and not any(x['out'] or x['rank'] for x in f['series']), f)
 again = rpc('final_create', MC)['draw']
@@ -218,6 +221,7 @@ for i in range(1, 3):
 check('after cuts: phase reveal for rank 3, no card yet', f['phase'] == 'reveal' and f['next_rank'] == 3 and f['next_card'] is None and f['pool_tickets'] == [], f)
 f = rpc('final_next', MC, f['id'])['draw']
 card3 = f['next_card']
+check('locked order honoured: UNO, NOVA cut; rank 3 = IKON', [x['code'] for x in f['series'] if x['out']] == ['U', 'N'] and card3 == 'I', f['series'])
 check('rank 3 card revealed (one of the 3 live cards)', f['phase'] == 'spin' and card3 and [x['code'] for x in f['series'] if x['rank'] == 3] == [card3] and not [x for x in f['series'] if x['code'] == card3][0]['out'], f)
 check('wheel pool = holders of that card', f['pool_left'] > 0 and all(t.startswith(card3 + '-') for t in f['pool_tickets']) and len(f['pool_tickets']) == f['pool_left'], f)
 f = rpc('final_next', MC, f['id'])['draw']
@@ -239,9 +243,11 @@ for rank in (2, 1):
     f = rpc('final_next', MC, f['id'])['draw']
     cards[rank] = f['next_card']
     check(f'rank {rank} card revealed, different from earlier', f['phase'] == 'spin' and cards[rank] and cards[rank] not in [cards[k] for k in cards if k != rank] and all(t.startswith(cards[rank] + '-') for t in f['pool_tickets']), f)
+    check(f'locked order: rank {rank} card = ' + {2: 'FORMA', 1: 'CASA'}[rank], cards[rank] == {2: 'F', 1: 'C'}[rank])
     f = rpc('final_next', MC, f['id'])['draw']
     check(f'spin rank {rank}', f['pending'] and f['pending']['rank'] == rank and f['pending']['ticket_no'].startswith(cards[rank] + '-'), f.get('pending'))
     f = rpc('final_claim', MC, f['id'], True)['draw']
+check('clear lock', rpc('admin_settings_save', A, {'final_order': None}).get('ok') and rpc('admin_stats', A)['settings']['final_order'] is None)
 check('3 prizes on 3 different cards', len({w['card'] for w in f['winners']}) == 3 and sorted(x['rank'] for x in f['series'] if x['rank']) == [1, 2, 3] and sum(1 for x in f['series'] if x['out']) == 2, f)
 check('final done after rank 1 claimed', f['done'] and f['next_rank'] is None and sorted(w['rank'] for w in f['winners']) == [1, 2, 3], f)
 check('winners are distinct people', len({w['ticket_no'] for w in f['winners']}) == 3)
