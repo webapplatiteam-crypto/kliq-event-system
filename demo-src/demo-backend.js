@@ -117,7 +117,7 @@
       winners: fin.filter(d => !d.voided).map(row).sort((a, b) => a.rank - b.rank),
       noshows: fin.filter(d => d.voided && d.void_reason === 'noshow').map(d => Object.assign(row(d), { at: d.voided_at })) };
   };
-  const finalPrizes = db => db.prizes.filter(z => z.kind === 'final').sort((a, b) => a.rank - b.rank).map(z => ({ rank: z.rank, name: z.name }));
+  const finalPrizes = db => db.prizes.filter(z => z.kind === 'final').sort((a, b) => a.rank - b.rank).map(z => ({ rank: z.rank, name: z.name, description: z.description || null, image: z.image || null }));
 
   const FN = {
     event_info: db => eventInfo(db),
