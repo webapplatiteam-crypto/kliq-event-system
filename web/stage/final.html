@@ -333,8 +333,9 @@
     if (!prev) return;
     const $$ = sel => Array.from(document.querySelectorAll(sel));
     if (prev.phase === 'cut' && next.step > prev.step) {       // เปิดการ์ด 1 ใบ (OUT หรือ IN ตามลำดับที่ล็อกไว้ · สุ่มว่าใบไหน)
-      const k = next.step, kind = OPEN_KIND[k];
+      const k = next.step;
       const opened = next.series.find(s => s.pos === k); if (!opened) return;
+      const kind = opened.out ? 'out' : 'in';   // ผล OUT/IN เอาจากเซิร์ฟเวอร์เสมอ (OPEN_KIND ใช้แค่บอกลำดับ)
       const live = $$('.scard:not(.out):not(.in)'), target = live.find(e => e.dataset.code === opened.code);
       if (!target) return;
       const last = k === 5;
