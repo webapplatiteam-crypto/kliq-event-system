@@ -115,7 +115,7 @@
   const prizeName = r => prizesOf(r).map(p => p.name).join(' + ') || ('รางวัลที่ ' + r);
   const prizeLabel = z => !z ? '' : `รางวัลที่ ${z.rank}` + (z.of > 1 ? ` (ชิ้นที่ ${z.seq}/${z.of})` : '');
   const imgTag = (src, cls) => src ? `<img class="${cls}" src="${src}" alt="">` : '';
-  const OPEN_KIND = [null, 'out', 'in', 'out', 'in', 'in'];        // ผลของการเปิดใบที่ 1..5 (ล็อกตามกติกา · สุ่มว่าใบไหน)
+  const OPEN_KIND = [null, 'out', 'in', 'in', 'out', 'in'];        // ผลของการเปิดใบที่ 1..5 (ล็อกตามกติกา · สุ่มว่าใบไหน)
 
   // ---------- เสียง (สร้างด้วย WebAudio ไม่ต้องมีไฟล์) ----------
   const SND = { on: K.LS.get('kliq_snd') !== '0', ctx: null, noise: null };

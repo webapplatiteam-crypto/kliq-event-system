@@ -30,7 +30,7 @@
       </section>
       <section class="lcard">
         <h2>กำหนดลำดับการ์ดล่วงหน้า (ไม่บังคับ)</h2>
-        <div class="sub">ถ้าตั้งไว้ จอเวทีจะเปิดการ์ดตามลำดับนี้แทนการสุ่ม: ใบที่ 1 OUT → ใบที่ 2 IN (รางวัลที่ 3) → ใบที่ 3 OUT → ใบที่ 4 IN (รางวัลที่ 2) → ใบที่ 5 IN (รางวัลที่ 1) · ส่วน "คน" ในแต่ละการ์ดยังสุ่มจากวงล้อ · ต้องตั้งก่อนกด "เริ่มรอบชิง" · ปล่อยเป็น "สุ่ม" ทุกใบ = สุ่มทั้งหมด</div>
+        <div class="sub">ถ้าตั้งไว้ จอเวทีจะเปิดการ์ดตามลำดับนี้แทนการสุ่ม: ใบที่ 1 OUT → ใบที่ 2 IN (รางวัลที่ 3) → ใบที่ 3 IN (รางวัลที่ 2) → ใบที่ 4 OUT → ใบที่ 5 IN (รางวัลที่ 1) · ส่วน "คน" ในแต่ละการ์ดยังสุ่มจากวงล้อ · ต้องตั้งก่อนกด "เริ่มรอบชิง" · ปล่อยเป็น "สุ่ม" ทุกใบ = สุ่มทั้งหมด</div>
         <div id="plan" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px"></div>
         <div class="row" style="margin-top:10px">
           <button class="lbtn primary" id="savePlan">บันทึกลำดับ</button>
@@ -41,7 +41,7 @@
       <section class="lcard">
         <div class="head"><h2>รางวัลรอบชิง (4 ชิ้น · 3 อันดับ)</h2><button class="lbtn" id="add" hidden>+ เพิ่มรางวัล</button></div>
         <div id="prizes" style="display:flex;flex-direction:column;gap:10px"></div>
-        <div class="sub">เปิดการ์ด 5 ใบ (OUT · IN · OUT · IN · IN) การ์ดที่เข้ารอบ 3 ใบ = รางวัลที่ 3 → 2 → 1 หมุนวงล้อจากผู้ถือการ์ดนั้น · รางวัลที่ 3 มี 2 ชิ้น หมุนวงล้อ 2 รอบจากการ์ดใบเดียวกัน (คนละคน) · รูปและรายละเอียดจะขึ้นบนจอเวที ป๊อปอัปผู้โชคดี และมือถือลูกค้า</div>
+        <div class="sub">เปิดการ์ด 5 ใบ (OUT · IN · IN · OUT · IN) การ์ดที่เข้ารอบ 3 ใบ = รางวัลที่ 3 → 2 → 1 หมุนวงล้อจากผู้ถือการ์ดนั้น · รางวัลที่ 3 มี 2 ชิ้น หมุนวงล้อ 2 รอบจากการ์ดใบเดียวกัน (คนละคน) · รูปและรายละเอียดจะขึ้นบนจอเวที ป๊อปอัปผู้โชคดี และมือถือลูกค้า</div>
       </section>
     </div>
     <section style="display:flex;flex-direction:column;gap:10px">
@@ -136,14 +136,14 @@
     { key: 'series_name', label: 'ซีรีส์' }, { get: x => fmtDateTime(x.drawn_at), label: 'เวลา' }]));
 
   // ---------- ลำดับการ์ดล่วงหน้า ----------
-  const ROLES = [['', 'สุ่ม'], ['out1', 'ใบที่ 1 · OUT'], ['r3', 'ใบที่ 2 · IN รางวัลที่ 3'], ['out2', 'ใบที่ 3 · OUT'], ['r2', 'ใบที่ 4 · IN รางวัลที่ 2'], ['r1', 'ใบที่ 5 · IN รางวัลที่ 1']];
-  const ORDER_SLOT = { out1: 0, r3: 1, out2: 2, r2: 3, r1: 4 };    // ตำแหน่งใน series_order = ลำดับเปิดการ์ด (1 OUT · 2 IN=ที่ 3 · 3 OUT · 4 IN=ที่ 2 · 5 IN=ที่ 1)
+  const ROLES = [['', 'สุ่ม'], ['out1', 'ใบที่ 1 · OUT'], ['r3', 'ใบที่ 2 · IN รางวัลที่ 3'], ['r2', 'ใบที่ 3 · IN รางวัลที่ 2'], ['out2', 'ใบที่ 4 · OUT'], ['r1', 'ใบที่ 5 · IN รางวัลที่ 1']];
+  const ORDER_SLOT = { out1: 0, r3: 1, r2: 2, out2: 3, r1: 4 };    // ตำแหน่งใน series_order = ลำดับเปิดการ์ด (1 OUT · 2 IN=ที่ 3 · 3 IN=ที่ 2 · 4 OUT · 5 IN=ที่ 1)
   function renderPlan(order, bySeries) {
     const roleOf = code => { if (!order) return ''; const i = order.indexOf(code); return i < 0 ? '' : Object.keys(ORDER_SLOT).find(k => ORDER_SLOT[k] === i) || ''; };
     const SER = [['U', 'UNO'], ['I', 'IKON'], ['F', 'FORMA'], ['N', 'NOVA'], ['C', 'CASA']];
     $('#plan').innerHTML = SER.map(([c, n]) => { const cnt = (bySeries.find(b => b.code === c) || {}).count; return `<label class="lfield">${n}${cnt != null ? ' <span class="sub">(' + cnt + ' คน)</span>' : ''}
       <select class="linput" data-plan="${c}">${ROLES.map(([v, t]) => `<option value="${v}" ${roleOf(c) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`; }).join('');
-    $('#planStatus').textContent = order && order.length === 5 ? 'ล็อกไว้: ' + order.map((c, i) => (SER.find(x => x[0] === c) || [c, c])[1] + ' ' + ['OUT', 'IN ที่ 3', 'OUT', 'IN ที่ 2', 'IN ที่ 1'][i]).join(' · ') : 'ยังไม่ได้ล็อก (สุ่มทั้งหมด)';
+    $('#planStatus').textContent = order && order.length === 5 ? 'ล็อกไว้: ' + order.map((c, i) => (SER.find(x => x[0] === c) || [c, c])[1] + ' ' + ['OUT', 'IN ที่ 3', 'IN ที่ 2', 'OUT', 'IN ที่ 1'][i]).join(' · ') : 'ยังไม่ได้ล็อก (สุ่มทั้งหมด)';
   }
   $('#savePlan').onclick = async () => {
     const sel = [...document.querySelectorAll('[data-plan]')]; const order = new Array(5).fill(null); const used = {};

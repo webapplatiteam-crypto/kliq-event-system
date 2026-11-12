@@ -189,7 +189,7 @@ check('register role can list', rpc('admin_participants', rpc('staff_login', 'RE
 ex = rpc('admin_export', A)
 check('export 400 rows', len(ex['rows']) == 400)
 
-# --- final draw v3: open 5 cards OUT/IN/OUT/IN/IN (random which), IN cards = rank 3/2/1, wheel per prize (rank 3 has 2 prizes)
+# --- final draw v3: open 5 cards OUT/IN/IN/OUT/IN (random which), IN cards = rank 3/2/1, wheel per prize (rank 3 has 2 prizes)
 pr = rpc('admin_prizes', MC)['rows']
 fin = [p for p in pr if p['kind'] == 'final']
 finals = {p['rank']: p for p in sorted(fin, key=lambda p: p['id'])}      # last prize per rank (rank 3 -> KEF)
@@ -212,23 +212,23 @@ normal = [p for p in rpc('admin_prizes', MC)['rows'] if p['kind'] == 'normal'][0
 st0 = rpc('final_state', MC)
 check('no final draw yet', st0.get('ok') and st0['draw'] is None and len(st0['prizes']) == 4 and st0['claim_sec'] == 30, st0)
 check('final_state prizes carry image', [p for p in st0['prizes'] if p['rank'] == 1][0]['image'] == IMG)
-# locked order = open order: pos1 OUT, pos2 IN(rank 3), pos3 OUT, pos4 IN(rank 2), pos5 IN(rank 1)
-check('lock card order', rpc('admin_settings_save', A, {'final_order': ['U', 'I', 'N', 'F', 'C']}).get('ok') and rpc('admin_stats', A)['settings']['final_order'] == ['U', 'I', 'N', 'F', 'C'])
+# locked order = open order: pos1 OUT, pos2 IN(rank 3), pos3 IN(rank 2), pos4 OUT, pos5 IN(rank 1)
+check('lock card order', rpc('admin_settings_save', A, {'final_order': ['U', 'I', 'F', 'N', 'C']}).get('ok') and rpc('admin_stats', A)['settings']['final_order'] == ['U', 'I', 'F', 'N', 'C'])
 check('bad lock (4 items) ignored', rpc('admin_settings_save', A, {'final_order': ['U', 'N', 'I', 'F']}).get('ok') and rpc('admin_stats', A)['settings']['final_order'] is None)
-check('lock again', rpc('admin_settings_save', A, {'final_order': ['U', 'I', 'N', 'F', 'C']}).get('ok'))
+check('lock again', rpc('admin_settings_save', A, {'final_order': ['U', 'I', 'F', 'N', 'C']}).get('ok'))
 f = rpc('final_create', MC)['draw']
 check('final created: 5 cards face down, phase cut', f['step'] == 0 and f['cuts'] == 5 and f['phase'] == 'cut' and len(f['series']) == 5 and not any(x['out'] or x['in'] or x['rank'] for x in f['series']) and f['next_rank'] == 3 and f['next_card'] is None, f)
 check('next prize = first rank-3 prize (1 of 2)', f['next_prize']['rank'] == 3 and f['next_prize']['seq'] == 1 and f['next_prize']['of'] == 2 and f['next_prize']['id'] == first3['id'], f['next_prize'])
 again = rpc('final_create', MC)['draw']
 check('create again returns same in-progress draw', again['id'] == f['id'])
 check('claim before spin rejected', rpc('final_claim', MC, f['id'], True).get('code') == 'NO_PENDING')
-expect = [('U', 'out', None), ('I', 'in', 3), ('N', 'out', None), ('F', 'in', 2), ('C', 'in', 1)]
+expect = [('U', 'out', None), ('I', 'in', 3), ('F', 'in', 2), ('N', 'out', None), ('C', 'in', 1)]
 for i, (code, kind, rank) in enumerate(expect, 1):
     f = rpc('final_next', MC, f['id'])['draw']
     c = [x for x in f['series'] if x['code'] == code][0]
     check(f'open card {i}: {code} is {kind.upper()}' + (f' rank {rank}' if rank else ''), f['step'] == i and c['out'] == (kind == 'out') and c['in'] == (kind == 'in') and c['rank'] == rank and c['pos'] == i, f['series'])
     check(f'after card {i}: phase ' + ('cut' if i < 5 else 'spin'), f['phase'] == ('cut' if i < 5 else 'spin'))
-check('outs not adjacent: cards 1 and 3', [x['code'] for x in f['series'] if x['out']] == ['U', 'N'] and sorted(x['rank'] for x in f['series'] if x['in']) == [1, 2, 3])
+check('outs not adjacent: cards 1 and 4', [x['code'] for x in f['series'] if x['out']] == ['U', 'N'] and sorted(x['rank'] for x in f['series'] if x['in']) == [1, 2, 3])
 card3 = f['next_card']
 check('rank 3 card = IKON, wheel pool = its holders', card3 == 'I' and f['pool_left'] > 0 and all(t.startswith('I-') for t in f['pool_tickets']) and len(f['pool_tickets']) == f['pool_left'], f)
 f = rpc('final_next', MC, f['id'])['draw']
