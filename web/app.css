@@ -26,6 +26,9 @@ body.dark { background: var(--bg); color: var(--ink); min-height: 100vh; }
 .stripe i:nth-child(3){background:var(--forma)} .stripe i:nth-child(4){background:var(--nova)} .stripe i:nth-child(5){background:var(--casa)}
 .topbar { display: flex; justify-content: space-between; align-items: center; min-height: 28px; font-size: 14px; color: var(--ink2); }
 .brand { font-size: 13px; letter-spacing: 4px; color: var(--gold); font-weight: 400; }
+.brand img, img.logo-sm { height: 18px; width: auto; display: block }
+.logo-hero { display: block; width: min(300px, 78%); height: auto; margin: 0 auto }
+.logo-mid { display: block; width: min(220px, 60%); height: auto; margin: 0 auto }
 .eyebrow { font-size: 12px; letter-spacing: 3px; color: var(--gold); font-weight: 400; }
 .wordmark { font-size: 60px; font-weight: 200; letter-spacing: 18px; line-height: 1; padding-left: 18px; text-align: center; }
 .tagline { font-size: 12px; letter-spacing: 4px; color: var(--ink2); text-align: center; }

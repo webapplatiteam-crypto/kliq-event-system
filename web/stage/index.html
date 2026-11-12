@@ -11,7 +11,7 @@
 <body class="stage" style="overflow:auto">
 <div class="stagewrap" style="max-width:1100px;margin:0 auto">
   <div class="head">
-    <div><div class="eyebrow">KLIQ LAUNCH · LUCKY DRAW</div><h1>เลือกรางวัลที่จะสุ่ม</h1></div>
+    <div><img src="/assets/logomark-white.png" alt="KLIQ" style="height:24px;width:auto;display:block;margin-bottom:6px"><div class="eyebrow">GRAND LAUNCH · LUCKY DRAW</div><h1>เลือกรางวัลที่จะสุ่ม</h1></div>
     <div style="display:flex;gap:10px;align-items:center"><span id="who" class="muted small"></span><button class="stagebtn ghost" id="out" style="min-height:44px;font-size:15px;padding:0 18px">ออก</button></div>
   </div>
   <div id="elig" class="notice"></div>
@@ -33,7 +33,7 @@
   const fin = pz.rows.filter(z => z.kind === 'final').sort((a, b) => a.rank - b.rank);
   const finDone = fin.length && fin.every(z => z.won >= 1);
   $('#list').innerHTML = (fin.length ? `<a href="/stage/final.html" class="card" style="text-decoration:none;color:var(--ink);border:1px solid var(--gold);grid-column:1/-1">
-    <span class="eyebrow">GRAND FINAL · คัดการ์ด 5 → 3 → เปิดการ์ดทีละใบ → หมุนวงล้อ รางวัลที่ 3 · 2 · 1</span>
+    <span class="eyebrow">GRAND FINAL · เปิดการ์ด 5 ใบ (OUT · IN · OUT · IN · IN) → หมุนวงล้อ รางวัลที่ 3 · 3 · 2 · 1</span>
     <b style="font-size:30px;font-weight:500">รอบชิงรางวัลใหญ่</b>
     <span class="muted">${fin.map(z => 'ที่ ' + z.rank + ' ' + esc(z.name)).join(' · ')}${finDone ? ' · ประกาศผลแล้ว' : ''}</span></a>` : `<div class="notice err">ยังไม่ได้ตั้งรางวัลรอบชิง ไปที่หลังบ้าน → Lucky Draw</div>`);
 })();
