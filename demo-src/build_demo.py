@@ -8,7 +8,7 @@ shutil.copy(os.path.join(HERE, 'demo-backend.js'), os.path.join(OUT, 'demo-backe
 shutil.copy(os.path.join(HERE, 'demo-hub.html'), os.path.join(OUT, 'index.html'))
 
 ABS = re.compile(r'''(href=|src=|location\.href = |location\.replace\(|location\.href = \(|: ')(["'])/(?!/)''')
-PATHS = ['index.html', 'passport.html', 'scan.html', 's.html', 'collection.html', 'privacy.html', 'staff/login.html', 'staff/souvenir.html',
+PATHS = ['index.html', 'passport.html', 'scan.html', 's.html', 'collection.html', 'privacy.html', 'staff/login.html', 'staff/souvenir.html', 'staff/station.html',
          'stage/index.html', 'stage/final.html', 'stage/prize.html', 'admin/index.html', 'admin/participants.html', 'admin/stations.html',
          'admin/souvenir.html', 'admin/draw.html', 'admin/settings.html', 'assets/', 'vendor/', 'app.js', 'app.css', 'config.js', 'admin/admin.js']
 
@@ -26,8 +26,9 @@ for root, _, files in os.walk(OUT):
         if f == 'app.js':
             s = s.replace("location.href = '/staff/login.html?next=' + encodeURIComponent(location.pathname + location.search)", "location.href = DEMO_BASE + 'staff/login.html?next=' + encodeURIComponent(location.pathname + location.search)")
             s = s.replace("location.href = '/staff/login.html'", "location.href = DEMO_BASE + 'staff/login.html'")
-            s = s.replace("return { admin: '/admin/index.html', souvenir: '/staff/souvenir.html', mc: '/stage/index.html', register: '/admin/participants.html' }[role] || '/staff/login.html';",
-                          "return DEMO_BASE + ({ admin: 'admin/index.html', souvenir: 'staff/souvenir.html', mc: 'stage/index.html', register: 'admin/participants.html' }[role] || 'staff/login.html');")
+            s = s.replace("return { admin: '/admin/index.html', souvenir: '/staff/souvenir.html', mc: '/stage/index.html', register: '/admin/participants.html', station: '/staff/station.html' }[role] || '/staff/login.html';",
+                          "return DEMO_BASE + ({ admin: 'admin/index.html', souvenir: 'staff/souvenir.html', mc: 'stage/index.html', register: 'admin/participants.html', station: 'staff/station.html' }[role] || 'staff/login.html');")
+            assert 'DEMO_BASE + ({ admin' in s, 'home() rewrite failed'
             s = s.replace("function seriesImg(code, kind) { return '/assets/kliq-'", "function seriesImg(code, kind) { return DEMO_BASE + 'assets/kliq-'")
             s = s.replace("  async function rpc(fn, args, opts) {\n    opts = opts || {};",
                           "  async function rpc(fn, args, opts) {\n    if (window.KLIQ_DEMO) { await sleep(120 + Math.random() * 180); return window.KLIQ_DEMO.call(fn, args); }\n    opts = opts || {};")
