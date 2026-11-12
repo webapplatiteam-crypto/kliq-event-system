@@ -211,7 +211,7 @@
     const go = $('#go');
     const p1 = prizeOf(1); if (p1.name) $('#top').textContent = p1.name;
     if (!draw) {
-      $('#track').innerHTML = ''; setHead('ทุกคนถือการ์ด KLIQ 1 ใบ · เปิดการ์ดทีละใบ 5 ครั้ง (OUT · IN · OUT · IN · IN) · การ์ดที่เข้ารอบ 3 ใบ = รางวัลที่ 3 · 2 · 1');
+      $('#track').innerHTML = ''; setHead('');
       $('#stagebody').innerHTML = cardsHTML(K._series || [], false); go.textContent = 'เริ่มรอบชิง'; go.disabled = false; return;
     }
     const ph = draw.phase, np = draw.next_prize, r = draw.next_rank;
@@ -223,7 +223,7 @@
 
     if (ph === 'cut') {
       const k = draw.step + 1;
-      setHead(draw.step === 0 ? 'เปิดการ์ดทีละใบ · ใบที่ 1 OUT · ใบที่ 2 IN · ใบที่ 3 OUT · ใบที่ 4 IN · ใบที่ 5 IN' : `เปิดแล้ว ${draw.step} ใบ · เข้ารอบ ${draw.series.filter(s => s.in).length} · ตกรอบ ${draw.series.filter(s => s.out).length} · เหลืออีก ${5 - draw.step} ใบ`);
+      setHead(draw.step === 0 ? '' : `เข้ารอบ ${draw.series.filter(s => s.in).length} · ตกรอบ ${draw.series.filter(s => s.out).length}`);
       $('#stagebody').innerHTML = cardsHTML(draw.series, false);
       go.textContent = `เปิดการ์ดใบที่ ${k}`; go.disabled = false; return;
     }
@@ -336,7 +336,7 @@
       if (!target) return;
       const last = k === 5;
       setHead(`เปิดการ์ดใบที่ ${k} … ใบไหน?`, true); drumroll(last ? 4600 : 3800); riser(last ? 4600 : 3800); await roulette(live, target, last ? 4600 : 3800);
-      gong(); setHead('การ์ด ' + opened.name + ' … เข้ารอบ หรือ ตกรอบ?  (กด Space เปิดผล)', true); await hold(HOLD_MS);   // ค้างให้พิธีกรพูด
+      gong(); setHead('การ์ด ' + opened.name + ' … เข้ารอบ หรือ ตกรอบ?', true); await hold(HOLD_MS);   // ค้างให้พิธีกรพูด
       if (kind === 'out') { setHead('การ์ด ' + opened.name + ' ตกรอบ!'); await eliminate(target); }
       else { setHead('การ์ด ' + opened.name + ' เข้ารอบ!'); await admit(target, 'IN'); }
       if (last) { const ins = next.series.filter(s => s.in).sort((a, b) => a.rank - b.rank); $$('.scard.in').forEach(e => e.classList.add('win')); fanfare(); confetti(360, true);
