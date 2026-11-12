@@ -40,7 +40,8 @@
     const open = s.registration_open && (!s.cutoff_at || new Date(s.cutoff_at) > new Date());
     $('#state').innerHTML = `<div class="lnotice ${open ? 'ok' : ''}">${open ? 'เปิดรับลงทะเบียน' : 'ปิดรับลงทะเบียนแล้ว'}${s.cutoff_at ? ' · ตัดยอดลุ้นโชค ' + K.fmtDateTime(s.cutoff_at) : ' · ยังไม่ได้ตั้งเวลาตัดยอด'}</div>`;
     const k = [
-      ['ลงทะเบียนแล้ว', r.registered, ' / ' + s.max_participants, 'ล่วงหน้า ' + r.pre + ' · Walk-in ' + r.walkin + ' · รายชื่อล่วงหน้า ' + r.preregistered_total],
+      ['ลงทะเบียนแล้ว (รับการ์ดแล้ว)', r.registered, ' / ' + s.max_participants, 'จากรายชื่อล่วงหน้า ' + r.pre + ' · Walk-in ' + r.walkin],
+      ['รายชื่อลงทะเบียนล่วงหน้า', r.preregistered_total, ' คน', 'มาถึงงานแล้ว ' + (r.preregistered_arrived || 0) + ' · ยังไม่มา ' + (r.preregistered_total - (r.preregistered_arrived || 0))],
       ['เริ่มเล่น Exhibition', r.started, ' คน', r.registered ? Math.round(r.started / r.registered * 100) + '% ของผู้ลงทะเบียน' : ''],
       ['ครบทุกฐาน', r.completed, ' คน', r.avg_complete_min != null ? 'เฉลี่ย ' + r.avg_complete_min + ' นาทีต่อคน' : ''],
       ['รับของที่ระลึกแล้ว', r.souvenir, ' คน', 'พิเศษ ' + r.souvenir_premium + ' · ทั่วไป ' + r.souvenir_basic],

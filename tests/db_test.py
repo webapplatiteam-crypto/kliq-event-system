@@ -95,6 +95,10 @@ rows = [{'phone': f'08{i:08d}', 'name': f'Pre User {i}', 'email': f'p{i}@x.com',
 rows.append({'phone': '123', 'name': 'bad'})
 imp = rpc('admin_import_prereg', A, rows, False)
 check('import prereg 50 ok, 1 rejected', imp.get('imported') == 50 and len(imp.get('rejected', [])) == 1, imp)
+pl = rpc('admin_prereg_list', A)
+check('prereg list: total/arrived counts', pl.get('ok') and pl['all'] == rpc('admin_stats', A)['preregistered_total'] and pl['arrived'] == rpc('admin_stats', A)['preregistered_arrived'], pl)
+check('prereg list: pending filter excludes arrived', all(x['arrived_at'] is None for x in rpc('admin_prereg_list', A, None, 'pending', 200, 0)['rows']))
+check('prereg list: search by name', rpc('admin_prereg_list', A, 'Pre User 1')['total'] >= 1)
 
 # --- registration
 check('bad phone', rpc('register_participant', 'abc', False, None, None, None, None, True).get('code') == 'BAD_PHONE')

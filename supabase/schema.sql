@@ -536,6 +536,7 @@ begin
     'pre', (select count(*) from participants where source = 'pre'),
     'walkin', (select count(*) from participants where source = 'walkin'),
     'preregistered_total', (select count(*) from preregistrations),
+    'preregistered_arrived', (select count(*) from preregistrations pr where exists (select 1 from participants p where p.phone = pr.phone)),
     'started', (select count(distinct participant_id) from stamps),
     'completed', (select count(*) from participants where completed_at is not null),
     'souvenir', (select count(*) from participants where souvenir_at is not null),
@@ -600,6 +601,27 @@ begin
       'prize', (select z.name from draw_results r join prizes z on z.id = r.prize_id where r.participant_id = p.id and not r.voided limit 1))
       order by p.created_at)
     from participants p join series se on se.code = p.series_code), '[]'::jsonb));
+end $$;
+
+-- รายชื่อลงทะเบียนล่วงหน้า + สถานะว่ามาถึงงานแล้ว (ลงทะเบียนรับการ์ดแล้ว) หรือยัง
+create or replace function admin_prereg_list(p_token text, p_search text default null, p_filter text default 'all',
+                                             p_limit int default 50, p_offset int default 0) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare s staff; q text := nullif(trim(coalesce(p_search, '')), '');
+begin
+  s := _staff_from_token(p_token, array['register']);
+  if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
+  return (with base as (
+      select pr.*, p.ref_code, p.ticket_no, p.created_at as arrived_at
+        from preregistrations pr left join participants p on p.phone = pr.phone
+       where (q is null or pr.name ilike '%' || q || '%' or pr.phone like '%' || q || '%' or coalesce(pr.company, '') ilike '%' || q || '%' or coalesce(pr.email, '') ilike '%' || q || '%')
+         and (p_filter = 'all' or (p_filter = 'arrived' and p.id is not null) or (p_filter = 'pending' and p.id is null)))
+    select jsonb_build_object('ok', true, 'total', (select count(*) from base),
+      'arrived', (select count(*) from preregistrations pr where exists (select 1 from participants p where p.phone = pr.phone)),
+      'all', (select count(*) from preregistrations),
+      'rows', (select coalesce(jsonb_agg(jsonb_build_object('phone', phone, 'name', name, 'email', email, 'company', company, 'imported_at', imported_at,
+                 'ref_code', ref_code, 'ticket_no', ticket_no, 'arrived_at', arrived_at) order by arrived_at desc nulls last, name), '[]'::jsonb)
+               from (select * from base order by arrived_at desc nulls last, name limit p_limit offset p_offset) x)));
 end $$;
 
 create or replace function admin_import_prereg(p_token text, p_rows jsonb, p_replace boolean default false) returns jsonb
@@ -1061,7 +1083,7 @@ grant execute on function
   souvenir_lookup(text, text), souvenir_redeem(text, text),
   admin_stats(text), admin_participants(text, text, text, int, int), admin_export(text),
   admin_import_prereg(text, jsonb, boolean), admin_stations(text), admin_station_save(text, int, text, boolean, boolean),
-  admin_settings_save(text, jsonb), admin_staff_list(text), admin_staff_save(text, text, text, text, text, boolean, int),
+  admin_settings_save(text, jsonb), admin_staff_list(text), admin_staff_save(text, text, text, text, text, boolean, int), admin_prereg_list(text, text, text, int, int),
   admin_prizes(text), admin_prize_save(text, int, text, text, int, int, int, text, text),
   draw_eligible_count(text), final_create(text), final_state(text, int), final_next(text, int), final_claim(text, int, boolean), final_replace(text, int),
   draw_prize_next(text, int), draw_results_list(text), draw_void(text, int)
