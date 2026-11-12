@@ -48,7 +48,8 @@
           <div class="row">
             <label class="lfield">บทบาท<select class="linput" id="t_role">
               <option value="souvenir">ของที่ระลึก – สแกนและมอบของ</option><option value="mc">พิธีกร – จอเวทีและสุ่มรางวัล</option>
-              <option value="register">ลงทะเบียน – ดูรายชื่อ ช่วยค้นหา</option><option value="admin">แอดมิน – ทุกเมนู</option></select></label>
+              <option value="register">ลงทะเบียน – ดูรายชื่อ ช่วยค้นหา</option><option value="station">ประจำฐาน – โชว์ QR ฐานบนมือถือ นับคนสแกน</option><option value="admin">แอดมิน – ทุกเมนู</option></select></label>
+            <label class="lfield" id="t_station_wrap" hidden>ประจำฐาน<select class="linput" id="t_station"></select></label>
             <label class="lfield">PIN 6 หลัก<input class="linput" id="t_pin" inputmode="numeric" maxlength="6" placeholder="เว้นว่าง = ไม่เปลี่ยน"></label>
           </div>
           <label class="check" style="color:var(--l-ink2)"><input type="checkbox" id="t_active" checked> เปิดใช้งาน (ปิด = ออกจากระบบทันที)</label>
@@ -66,9 +67,12 @@
   const { $, rpc, msg, esc, toast } = K;
   const me = await AdminShell('settings', []);
   if (!me) return;
-  const ROLE = { admin: 'แอดมิน', souvenir: 'ของที่ระลึก', mc: 'พิธีกร', register: 'ลงทะเบียน' };
+  const ROLE = { admin: 'แอดมิน', souvenir: 'ของที่ระลึก', mc: 'พิธีกร', register: 'ลงทะเบียน', station: 'ประจำฐาน' };
+  const stationWrap = () => { $('#t_station_wrap').hidden = $('#t_role').value !== 'station'; };
+  $('#t_role').onchange = stationWrap;
   async function load() {
-    const [st, sf] = await Promise.all([rpc('admin_stats', { p_token: me.token }), rpc('admin_staff_list', { p_token: me.token })]);
+    const [st, sf, sn] = await Promise.all([rpc('admin_stats', { p_token: me.token }), rpc('admin_staff_list', { p_token: me.token }), rpc('admin_stations', { p_token: me.token })]);
+    if (sn && sn.ok) { const cur = $('#t_station').value; $('#t_station').innerHTML = sn.rows.map(x => `<option value="${x.id}">ฐาน ${x.sort} · ${esc(x.name)}</option>`).join(''); if (cur) $('#t_station').value = cur; }
     if (st && st.ok) {
       const s = st.settings;
       ['event_name', 'max_participants', 'series_quota', 'min_stamp_interval_sec', 'announce_text', 'final_claim_sec', 'souvenir_basic_name', 'souvenir_premium_name'].forEach(k => $('#' + k).value = s[k]);
@@ -76,13 +80,13 @@
       $('#hint').textContent = 'ตอนนี้ลงทะเบียนแล้ว ' + st.registered + ' คน · 5 ซีรีส์ × โควตา ' + s.series_quota + ' = ' + s.series_quota * 5 + ' ที่' +
         (s.series_quota * 5 < s.max_participants ? ' (น้อยกว่าจำนวนสูงสุด ควรเพิ่มโควตา)' : '');
     }
-    if (sf && sf.ok) $('#staff').innerHTML = sf.rows.map(x => `<tr style="cursor:pointer" data-code="${esc(x.code)}" data-name="${esc(x.display_name)}" data-role="${x.role}" data-active="${x.active}">
-      <td style="font-weight:500">${esc(x.code)}</td><td>${esc(x.display_name)}</td><td>${ROLE[x.role]}</td>
+    if (sf && sf.ok) $('#staff').innerHTML = sf.rows.map(x => `<tr style="cursor:pointer" data-code="${esc(x.code)}" data-name="${esc(x.display_name)}" data-role="${x.role}" data-active="${x.active}" data-station="${x.station_id || ''}">
+      <td style="font-weight:500">${esc(x.code)}</td><td>${esc(x.display_name)}</td><td>${ROLE[x.role] || x.role}${x.station_name ? ' · ' + esc(x.station_name) : ''}</td>
       <td>${!x.active ? '<span class="pill void">ปิด</span>' : x.locked ? '<span class="pill wait">ล็อก (กดบันทึกเพื่อปลด)</span>' : '<span class="pill pre">ใช้งาน</span>'}</td></tr>`).join('');
   }
   $('#staff').onclick = e => { const tr = e.target.closest('tr'); if (!tr) return;
     $('#t_code').value = tr.dataset.code; $('#t_name').value = tr.dataset.name; $('#t_role').value = tr.dataset.role;
-    $('#t_active').checked = tr.dataset.active === 'true'; $('#t_pin').value = ''; $('#t_pin').focus(); };
+    $('#t_active').checked = tr.dataset.active === 'true'; $('#t_pin').value = ''; stationWrap(); if (tr.dataset.station) $('#t_station').value = tr.dataset.station; $('#t_pin').focus(); };
   $('#sf').onsubmit = async e => {
     e.preventDefault();
     const p = { event_name: $('#event_name').value, max_participants: +$('#max_participants').value, series_quota: +$('#series_quota').value,
@@ -93,7 +97,8 @@
   $('#tf').onsubmit = async e => {
     e.preventDefault();
     const r = await rpc('admin_staff_save', { p_token: me.token, p_code: $('#t_code').value, p_name: $('#t_name').value, p_role: $('#t_role').value,
-      p_pin: $('#t_pin').value || null, p_active: $('#t_active').checked });
+      p_pin: $('#t_pin').value || null, p_active: $('#t_active').checked, p_station_id: $('#t_role').value === 'station' ? +$('#t_station').value || null : null });
+    if (r && r.code === 'NEED_STATION') { toast('เลือกฐานที่ประจำก่อน', 'err'); return; }
     toast(r && r.ok ? 'บันทึกทีมงานแล้ว' : msg(r), r && r.ok ? 'ok' : 'err');
     if (r && r.ok) { $('#tf').reset(); $('#t_active').checked = true; }
     load();

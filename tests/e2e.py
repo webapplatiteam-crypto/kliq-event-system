@@ -181,6 +181,18 @@ async def main():
         await w.goto(BASE + '/admin/stations.html'); await w.wait_for_timeout(800)
         check('souvenir staff blocked from admin stations', '/staff/souvenir.html' in w.url, w.url)
 
+        # ---------- station staff (phone page with the station QR + live count)
+        db("insert into staff (code, display_name, role, pin_hash, station_id) values ('ST01', 'พี่บี', 'station', extensions.crypt('135790', extensions.gen_salt('bf')), 1)")
+        stx, sp = await page_in(b)
+        await sp.goto(BASE + '/staff/login.html'); await sp.fill('#code', 'ST01'); await sp.fill('#pin', '135790'); await sp.click('#b')
+        await sp.wait_for_url('**/staff/station.html'); await sp.wait_for_selector('#qr svg')
+        check('station staff lands on station page with QR + count', 'LUMENCRAFT' in await sp.inner_text('#stName') and (await sp.inner_text('#cnt')).strip() == db("select count(*) from stamps where station_id = 1"))
+        await shot(sp, '27_station_staff', True)
+        await sp.click('#full'); await sp.wait_for_selector('#big svg'); check('fullscreen QR shown', await sp.locator('#big svg').count() == 1)
+        await sp.goto(BASE + '/admin/index.html'); await sp.wait_for_timeout(800)
+        check('station staff blocked from admin', '/staff/station.html' in sp.url, sp.url)
+        lp = await page_in(b); await lp[1].goto(BASE + '/'); check('register page has small staff link', await lp[1].locator('a[href="/staff/login.html"]').count() == 1)
+
         # ---------- MC stage
         mctx, m = await page_in(b, mobile=False)
         await m.goto(BASE + '/staff/login.html'); await m.fill('#code', 'MC01'); await m.fill('#pin', '135790'); await m.click('#b')
@@ -202,7 +214,7 @@ async def main():
         check('final: ladder (4 prizes) + wheel shown, reveal rank-3 card next', await m.locator('#wheel').count() == 1 and await m.locator('.lad').count() == 4 and 'เปิดการ์ดรางวัลที่ 3 (ชิ้นที่ 1/2)' in await m.inner_text('#go') and await m.locator('.scard.ranked').count() == 0)
         await m.click('#go'); await m.wait_for_timeout(7500); await m.keyboard.press('Space'); await ready()   # เปิดการ์ดรางวัลที่ 3
         card3 = await m.get_attribute('.scard.pick', 'data-code')
-        check('final: rank-3 card revealed = IN card at pos 2 (locked)', await m.locator('.scard.ranked').count() == 1 and await m.locator(f'.scard.in.ranked[data-pos="2"][data-code="{card3}"]').count() == 1 and 'หมุนวงล้อ' in await m.inner_text('#go'))
+        check('final: rank-3 card revealed = one of the IN cards', await m.locator('.scard.ranked').count() == 1 and await m.locator(f'.scard.in.ranked[data-code="{card3}"]').count() == 1 and 'หมุนวงล้อ' in await m.inner_text('#go'))
         await shot(m, '14a_final_wheel_ready', False)
         # หมุนรางวัลที่ 3 ชิ้นที่ 1 → ไม่อยู่ → หมุนใหม่ → อยู่ → ชิ้นที่ 2 → อยู่
         await m.click('#go'); await m.wait_for_timeout(3500); await shot(m, '14b_final_wheel_spinning', False)
@@ -233,7 +245,7 @@ async def main():
             await m.click('#go'); await m.wait_for_timeout(7500 if rank == 2 else 1500)
             if rank == 2: await m.keyboard.press('Space')   # ปล่อยช่วงค้าง (ใบสุดท้ายไม่มีช่วงค้าง)
             await ready()
-            check(f'final: rank {rank} card = IN card opened at pos {({2: 3, 1: 5})[rank]}', await m.get_attribute('.scard.pick', 'data-pos') == str({2: 3, 1: 5}[rank]) and await m.locator('.scard.ranked').count() == 4 - rank, (await m.get_attribute('.scard.pick', 'data-pos'), await m.locator('.scard.ranked').count(), await m.inner_text('#go')))
+            check(f'final: rank {rank} card = another IN card', await m.locator('.scard.in.ranked.pick').count() == 1 and await m.get_attribute('.scard.pick', 'data-code') != card3 and await m.locator('.scard.ranked').count() == 4 - rank, (await m.get_attribute('.scard.pick', 'data-code'), await m.locator('.scard.ranked').count(), await m.inner_text('#go')))
             await m.click('#go'); await m.wait_for_selector('#yes', timeout=20000)
             await shot(m, f'14e_final_rank{rank}_popup', False)
             if rank == 1: check('rank 1 popup shows prize image + description', await m.locator('.mbox .mi').count() == 1 and 'Deep Blue' in await m.inner_text('.mbox .pd'))

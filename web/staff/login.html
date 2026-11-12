@@ -9,11 +9,19 @@
 <link rel="stylesheet" href="/app.css">
 </head>
 <body class="light">
-<main style="max-width:420px;margin:0 auto;padding:48px 20px;display:flex;flex-direction:column;gap:22px">
-  <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
-    <div style="width:72px;height:72px;border-radius:20px;background:#121212;display:flex;align-items:center;justify-content:center">
-      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#C9A063" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
-    <img src="/assets/logomark-black.png" alt="KLIQ" style="height:26px;width:auto"><div style="font-size:12px;letter-spacing:3px;color:#8A6A3C">STAFF &amp; ADMIN</div>
+<style>
+  body.light { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 0%, #FBF8F2, #EFEBE3 70%); }
+  .login { width: min(400px, 92vw); display: flex; flex-direction: column; gap: 18px; padding: 24px 0 40px; }
+  .login .brandbox { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .login .lcard { gap: 14px; padding: 22px; box-shadow: 0 18px 50px rgba(60, 45, 20, .10); }
+  .login .lfield { flex: 0 0 auto; }
+  .login .lfield .linput { min-height: 50px; font-size: 17px; }
+  .login h1 { font-size: 22px; margin: 4px 0 0; }
+</style>
+<main class="login">
+  <div class="brandbox">
+    <img src="/assets/logo-black.png" alt="KLIQ — Every Room Simplified" style="width:200px;height:auto">
+    <div style="font-size:11px;letter-spacing:4px;color:#8A6A3C">STAFF &amp; ADMIN</div>
     <h1>เข้าสู่ระบบเจ้าหน้าที่</h1>
   </div>
   <form id="f" class="lcard">
@@ -22,7 +30,7 @@
     <div id="err" class="lnotice" hidden role="alert"></div>
     <button class="lbtn primary" id="b" type="submit" style="min-height:52px">เข้าสู่ระบบ</button>
   </form>
-  <p class="sub" style="text-align:center;margin:0">ลืม PIN? ติดต่อแอดมินประจำงาน</p>
+  <p class="sub" style="text-align:center;margin:0">ลืม PIN? ติดต่อแอดมินประจำงาน · <a href="/" style="color:inherit">กลับหน้าลงทะเบียน</a></p>
 </main>
 <script src="/config.js"></script>
 <script src="/app.js"></script>

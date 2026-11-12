@@ -37,7 +37,8 @@
       { id: 's1', code: 'ADMIN01', display_name: 'ผู้ดูแลระบบหลัก', role: 'admin', pin: '123456', active: true, failed: 0, locked_until: null },
       { id: 's2', code: 'STAFF01', display_name: 'น้องเอ จุดรับของ', role: 'souvenir', pin: '123456', active: true, failed: 0, locked_until: null },
       { id: 's3', code: 'MC01', display_name: 'พิธีกร', role: 'mc', pin: '123456', active: true, failed: 0, locked_until: null },
-      { id: 's4', code: 'REG01', display_name: 'จุดลงทะเบียน', role: 'register', pin: '123456', active: true, failed: 0, locked_until: null }
+      { id: 's4', code: 'REG01', display_name: 'จุดลงทะเบียน', role: 'register', pin: '123456', active: true, failed: 0, locked_until: null },
+      { id: 's5', code: 'ST01', display_name: 'พี่บี ประจำฐาน 1', role: 'station', station_id: 1, pin: '123456', active: true, failed: 0, locked_until: null }
     ];
     db.prizes = [
       { id: 1, name: 'iPhone 18 Pro Max', kind: 'final', rank: 1, quantity: 1, sort: 1 },
@@ -147,8 +148,11 @@
       if (s.locked_until && new Date(s.locked_until) > new Date()) return { ok: false, code: 'LOCKED' };
       if (s.pin !== a.p_pin) { s.failed++; if (s.failed >= 5) s.locked_until = new Date(Date.now() + 600000).toISOString(); return { ok: false, code: 'BAD_LOGIN' }; }
       s.failed = 0; s.locked_until = null; const t = tok(32); db.sessions.push({ token: t, staff_id: s.id, expires_at: new Date(Date.now() + 18 * 3600000).toISOString() });
-      return { ok: true, token: t, role: s.role, name: s.display_name, code: s.code }; },
-    staff_me: (db, a) => { const s = staffFrom(db, a.p_token, ['admin', 'souvenir', 'mc', 'register']); return s ? { ok: true, role: s.role, name: s.display_name, code: s.code } : AUTH; },
+      return { ok: true, token: t, role: s.role, name: s.display_name, code: s.code, station_id: s.station_id || null }; },
+    staff_me: (db, a) => { const s = staffFrom(db, a.p_token, ['admin', 'souvenir', 'mc', 'register', 'station']); return s ? { ok: true, role: s.role, name: s.display_name, code: s.code, station_id: s.station_id || null } : AUTH; },
+    station_me: (db, a) => { const s = staffFrom(db, a.p_token, ['station']); if (!s) return AUTH; const sid = s.role === 'admin' ? (a.p_station_id || s.station_id) : s.station_id; const st = db.stations.find(x => x.id === sid); if (!st) return { ok: false, code: 'NO_STATION' };
+      const sp = db.stamps.filter(x => x.station_id === st.id).sort((x, y) => y.created_at.localeCompare(x.created_at));
+      return { ok: true, id: st.id, name: st.name, sort: st.sort, active: st.active, qr_token: st.qr_token, count: sp.length, staff: s.display_name, last10: sp.slice(0, 10).map(x => { const p = db.participants.find(q => q.id === x.participant_id) || {}; return { ticket_no: p.ticket_no, name: maskName(p.name || ''), at: x.created_at }; }) }; },
     staff_logout: (db, a) => { db.sessions = db.sessions.filter(x => x.token !== a.p_token); return { ok: true }; },
     souvenir_lookup: (db, a) => { const s = staffFrom(db, a.p_token, ['souvenir']); if (!s) return AUTH; let q = String(a.p_query || '').trim(); if (q.startsWith('KLIQ:')) q = q.slice(5); const ph = normPhone(q);
       const p = db.participants.find(x => x.ref_code.toUpperCase() === q.toUpperCase() || x.ticket_no.toUpperCase() === q.toUpperCase() || (ph && x.phone === ph)); if (!p) return { ok: false, code: ph && db.prereg.some(x => x.phone === ph) ? 'NOT_REGISTERED' : 'NOT_FOUND' };
@@ -187,13 +191,13 @@
       if ('final_order' in p) c.final_order = Array.isArray(p.final_order) && p.final_order.length === 5 ? p.final_order : null;
       ['event_name', 'announce_text', 'souvenir_basic_name', 'souvenir_premium_name'].forEach(k => { if (p[k] != null && String(p[k]).trim()) c[k] = p[k]; }); ['max_participants', 'series_quota', 'min_stamp_interval_sec', 'final_claim_sec'].forEach(k => { if (p[k] != null && !isNaN(+p[k])) c[k] = +p[k]; });
       if (p.registration_open != null) c.registration_open = !!p.registration_open; if ('cutoff_at' in p) c.cutoff_at = p.cutoff_at ? new Date(p.cutoff_at).toISOString() : null; c.updated_at = now(); return { ok: true }; },
-    admin_staff_list: (db, a) => { const s = staffFrom(db, a.p_token, []); if (!s) return AUTH; return { ok: true, rows: db.staff.map(x => ({ code: x.code, display_name: x.display_name, role: x.role, active: x.active, locked: !!(x.locked_until && new Date(x.locked_until) > new Date()) })) }; },
+    admin_staff_list: (db, a) => { const s = staffFrom(db, a.p_token, []); if (!s) return AUTH; return { ok: true, rows: db.staff.map(x => ({ code: x.code, display_name: x.display_name, role: x.role, active: x.active, locked: !!(x.locked_until && new Date(x.locked_until) > new Date()), station_id: x.station_id || null, station_name: (db.stations.find(st => st.id === x.station_id) || {}).name || null })) }; },
     admin_staff_save: (db, a) => { const s = staffFrom(db, a.p_token, []); if (!s) return AUTH; const c = String(a.p_code || '').trim().toUpperCase();
-      if (!/^[A-Z0-9_-]{3,20}$/.test(c)) return { ok: false, code: 'BAD_CODE' }; if (!['admin', 'souvenir', 'mc', 'register'].includes(a.p_role)) return { ok: false, code: 'BAD_ROLE' };
+      if (!/^[A-Z0-9_-]{3,20}$/.test(c)) return { ok: false, code: 'BAD_CODE' }; if (!['admin', 'souvenir', 'mc', 'register', 'station'].includes(a.p_role)) return { ok: false, code: 'BAD_ROLE' }; if (a.p_role === 'station' && !db.stations.some(x => x.id === a.p_station_id)) return { ok: false, code: 'NEED_STATION' };
       if (a.p_pin && !/^\d{6}$/.test(a.p_pin)) return { ok: false, code: 'BAD_PIN' }; if (c === s.code && (a.p_role !== 'admin' || !a.p_active)) return { ok: false, code: 'SELF_LOCKOUT' };
       const ex = db.staff.find(x => x.code === c);
-      if (ex) { if (a.p_name && a.p_name.trim()) ex.display_name = a.p_name.trim(); ex.role = a.p_role; ex.active = a.p_active !== false; if (a.p_pin) ex.pin = a.p_pin; ex.failed = 0; ex.locked_until = null; if (!ex.active) db.sessions = db.sessions.filter(x => x.staff_id !== ex.id); }
-      else { if (!a.p_pin) return { ok: false, code: 'BAD_PIN' }; db.staff.push({ id: uid(), code: c, display_name: (a.p_name || '').trim() || c, role: a.p_role, pin: a.p_pin, active: true, failed: 0, locked_until: null }); }
+      if (ex) { if (a.p_name && a.p_name.trim()) ex.display_name = a.p_name.trim(); ex.role = a.p_role; ex.station_id = a.p_role === 'station' ? a.p_station_id : null; ex.active = a.p_active !== false; if (a.p_pin) ex.pin = a.p_pin; ex.failed = 0; ex.locked_until = null; if (!ex.active) db.sessions = db.sessions.filter(x => x.staff_id !== ex.id); }
+      else { if (!a.p_pin) return { ok: false, code: 'BAD_PIN' }; db.staff.push({ id: uid(), code: c, display_name: (a.p_name || '').trim() || c, role: a.p_role, station_id: a.p_role === 'station' ? a.p_station_id : null, pin: a.p_pin, active: true, failed: 0, locked_until: null }); }
       return { ok: true }; },
     admin_prizes: (db, a) => { const s = staffFrom(db, a.p_token, ['mc']); if (!s) return AUTH; return { ok: true, rows: db.prizes.slice().sort((x, y) => x.kind.localeCompare(y.kind) || (x.rank || 99) - (y.rank || 99) || x.sort - y.sort).map(z => Object.assign({}, z, { won: db.results.filter(r => r.prize_id === z.id && !r.voided).length })) }; },
     admin_prize_save: (db, a) => { const s = staffFrom(db, a.p_token, []); if (!s) return AUTH; if (!['final', 'normal'].includes(a.p_kind) || !(a.p_quantity >= 1) || !String(a.p_name || '').trim() || (a.p_kind === 'final' && !(a.p_rank >= 1 && a.p_rank <= 3))) return { ok: false, code: 'BAD_INPUT' };

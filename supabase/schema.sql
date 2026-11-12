@@ -88,13 +88,18 @@ create table if not exists staff (
   id            uuid primary key default gen_random_uuid(),
   code          text not null unique,
   display_name  text not null,
-  role          text not null check (role in ('admin','souvenir','mc','register')),
+  role          text not null,
   pin_hash      text not null,
   active        boolean not null default true,
   failed_count  int not null default 0,
   locked_until  timestamptz,
   created_at    timestamptz not null default now()
 );
+
+-- เจ้าหน้าที่ประจำฐาน (role = station) ผูกกับฐาน 1 ฐาน: เปิดหน้า QR ของฐานบนมือถือและดูจำนวนคนที่สแกน
+alter table staff drop constraint if exists staff_role_check;
+alter table staff add constraint staff_role_check check (role in ('admin','souvenir','mc','register','station'));
+alter table staff add column if not exists station_id int references stations(id) on delete set null;
 
 create table if not exists staff_sessions (
   token       text primary key,
@@ -422,16 +427,33 @@ begin
   tok := _rand_token(32);
   insert into staff_sessions (token, staff_id, expires_at) values (tok, s.id, now() + interval '18 hours');
   delete from staff_sessions where expires_at < now();
-  return jsonb_build_object('ok', true, 'token', tok, 'role', s.role, 'name', s.display_name, 'code', s.code);
+  return jsonb_build_object('ok', true, 'token', tok, 'role', s.role, 'name', s.display_name, 'code', s.code, 'station_id', s.station_id);
 end $$;
 
 create or replace function staff_me(p_token text) returns jsonb
 language plpgsql stable security definer set search_path = public as $$
 declare s staff;
 begin
-  s := _staff_from_token(p_token, array['admin','souvenir','mc','register']);
+  s := _staff_from_token(p_token, array['admin','souvenir','mc','register','station']);
   if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
-  return jsonb_build_object('ok', true, 'role', s.role, 'name', s.display_name, 'code', s.code);
+  return jsonb_build_object('ok', true, 'role', s.role, 'name', s.display_name, 'code', s.code, 'station_id', s.station_id);
+end $$;
+
+-- หน้าเจ้าหน้าที่ประจำฐาน: ข้อมูลฐานของตัวเอง + จำนวนที่สแกนแล้ว (แอดมินดูได้ทุกฐานโดยส่ง p_station_id)
+create or replace function station_me(p_token text, p_station_id int default null) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare s staff; st stations; sid int;
+begin
+  s := _staff_from_token(p_token, array['station']);
+  if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
+  sid := case when s.role = 'admin' then coalesce(p_station_id, s.station_id) else s.station_id end;
+  select * into st from stations where id = sid;
+  if st.id is null then return jsonb_build_object('ok', false, 'code', 'NO_STATION'); end if;
+  return jsonb_build_object('ok', true, 'id', st.id, 'name', st.name, 'sort', st.sort, 'active', st.active, 'qr_token', st.qr_token,
+    'count', (select count(*) from stamps where station_id = st.id),
+    'last10', (select coalesce(jsonb_agg(jsonb_build_object('ticket_no', p.ticket_no, 'name', _mask_name(p.name), 'at', sp.created_at) order by sp.created_at desc), '[]'::jsonb)
+               from (select * from stamps where station_id = st.id order by created_at desc limit 10) sp join participants p on p.id = sp.participant_id),
+    'staff', s.display_name);
 end $$;
 
 create or replace function staff_logout(p_token text) returns jsonb
@@ -661,30 +683,33 @@ begin
   s := _staff_from_token(p_token, array[]::text[]);
   if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
   return jsonb_build_object('ok', true, 'rows', coalesce((select jsonb_agg(jsonb_build_object(
-    'code', code, 'display_name', display_name, 'role', role, 'active', active, 'locked', locked_until > now()) order by role, code) from staff), '[]'::jsonb));
+    'code', code, 'display_name', display_name, 'role', role, 'active', active, 'locked', locked_until > now(),
+    'station_id', station_id, 'station_name', (select name from stations where id = staff.station_id)) order by role, code) from staff), '[]'::jsonb));
 end $$;
 
+drop function if exists admin_staff_save(text, text, text, text, text, boolean);
 create or replace function admin_staff_save(p_token text, p_code text, p_name text, p_role text, p_pin text default null,
-                                            p_active boolean default true) returns jsonb
+                                            p_active boolean default true, p_station_id int default null) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare s staff; c text := upper(trim(coalesce(p_code, '')));
 begin
   s := _staff_from_token(p_token, array[]::text[]);
   if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
   if c !~ '^[A-Z0-9_-]{3,20}$' then return jsonb_build_object('ok', false, 'code', 'BAD_CODE'); end if;
-  if p_role not in ('admin','souvenir','mc','register') then return jsonb_build_object('ok', false, 'code', 'BAD_ROLE'); end if;
+  if p_role not in ('admin','souvenir','mc','register','station') then return jsonb_build_object('ok', false, 'code', 'BAD_ROLE'); end if;
+  if p_role = 'station' and (p_station_id is null or not exists (select 1 from stations where id = p_station_id)) then return jsonb_build_object('ok', false, 'code', 'NEED_STATION'); end if;
   if p_pin is not null and p_pin <> '' and p_pin !~ '^\d{6}$' then return jsonb_build_object('ok', false, 'code', 'BAD_PIN'); end if;
   if c = s.code and (p_role <> 'admin' or not p_active) then return jsonb_build_object('ok', false, 'code', 'SELF_LOCKOUT'); end if;
   if exists (select 1 from staff where code = c) then
-    update staff set display_name = coalesce(nullif(trim(p_name), ''), display_name), role = p_role, active = p_active,
+    update staff set display_name = coalesce(nullif(trim(p_name), ''), display_name), role = p_role, active = p_active, station_id = case when p_role = 'station' then p_station_id else null end,
            pin_hash = case when coalesce(p_pin, '') <> '' then extensions.crypt(p_pin, extensions.gen_salt('bf')) else pin_hash end,
            failed_count = 0, locked_until = null
      where code = c;
     if not p_active then delete from staff_sessions where staff_id = (select id from staff where code = c); end if;
   else
     if coalesce(p_pin, '') = '' then return jsonb_build_object('ok', false, 'code', 'BAD_PIN'); end if;
-    insert into staff (code, display_name, role, pin_hash)
-    values (c, coalesce(nullif(trim(p_name), ''), c), p_role, extensions.crypt(p_pin, extensions.gen_salt('bf')));
+    insert into staff (code, display_name, role, pin_hash, station_id)
+    values (c, coalesce(nullif(trim(p_name), ''), c), p_role, extensions.crypt(p_pin, extensions.gen_salt('bf')), case when p_role = 'station' then p_station_id end);
   end if;
   insert into audit_log (staff_id, action, detail) values (s.id, 'staff_save', jsonb_build_object('code', c, 'role', p_role));
   return jsonb_build_object('ok', true);
@@ -1032,11 +1057,11 @@ revoke all on all sequences in schema public from anon, authenticated;
 
 grant execute on function
   event_info(), register_participant(text, boolean, text, text, text, text, boolean), get_passport(text),
-  collect_stamp(text, text), staff_login(text, text), staff_me(text), staff_logout(text),
+  collect_stamp(text, text), staff_login(text, text), staff_me(text), staff_logout(text), station_me(text, int),
   souvenir_lookup(text, text), souvenir_redeem(text, text),
   admin_stats(text), admin_participants(text, text, text, int, int), admin_export(text),
   admin_import_prereg(text, jsonb, boolean), admin_stations(text), admin_station_save(text, int, text, boolean, boolean),
-  admin_settings_save(text, jsonb), admin_staff_list(text), admin_staff_save(text, text, text, text, text, boolean),
+  admin_settings_save(text, jsonb), admin_staff_list(text), admin_staff_save(text, text, text, text, text, boolean, int),
   admin_prizes(text), admin_prize_save(text, int, text, text, int, int, int, text, text),
   draw_eligible_count(text), final_create(text), final_state(text, int), final_next(text, int), final_claim(text, int, boolean), final_replace(text, int),
   draw_prize_next(text, int), draw_results_list(text), draw_void(text, int)

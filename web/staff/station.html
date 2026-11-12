@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เจ้าหน้าที่ประจำฐาน | KLIQ Staff</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+<style>
+  .qrbig { background:#fff; border-radius:20px; padding:16px; display:flex; flex-direction:column; align-items:center; gap:10px; border:1px solid var(--l-line) }
+  .qrbig svg { width:min(78vw, 360px); height:auto; display:block }
+  .cnt { display:flex; align-items:baseline; gap:10px } .cnt b { font-size:56px; font-weight:400; line-height:1 } .cnt span { color:var(--l-ink2) }
+  .recent { display:flex; flex-direction:column; gap:6px } .recent div { display:flex; justify-content:space-between; padding:8px 12px; border-radius:10px; background:#F4F1EB; font-size:14px }
+  .recent div b { font-weight:500; letter-spacing:1px }
+  .big { position:fixed; inset:0; background:#fff; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px }
+  .big[hidden] { display:none }
+  .big svg { width:min(92vw, 92vh); height:auto } .big .nm { font-size:22px; letter-spacing:4px; font-weight:500 }
+</style>
+</head>
+<body class="light">
+<main style="max-width:520px;margin:0 auto;padding:20px 16px 40px;display:flex;flex-direction:column;gap:16px">
+  <div class="head">
+    <div><img src="/assets/logomark-black.png" alt="KLIQ" style="height:16px;width:auto;margin-bottom:4px"><div style="font-size:12px;letter-spacing:3px;color:#8A6A3C">STAFF · ประจำฐาน</div><h1 style="font-size:22px" id="stName">กำลังโหลด…</h1></div>
+    <button class="lbtn" id="out" style="min-height:40px">ออก</button>
+  </div>
+  <div id="err" class="lnotice" hidden role="alert"></div>
+  <section class="lcard" style="align-items:center">
+    <div class="cnt"><b id="cnt">–</b><span>คนสแกนแล้ว</span></div>
+    <div class="sub" id="upd" style="margin:0">อัปเดตอัตโนมัติทุก 10 วินาที</div>
+  </section>
+  <section class="qrbig" id="qrbox">
+    <div class="sub" style="margin:0">QR ของฐานนี้ · ให้ลูกค้าสแกนเพื่อรับแสตมป์</div>
+    <div id="qr"></div>
+    <button class="lbtn primary" id="full" style="min-height:48px;width:100%">แสดง QR เต็มจอ</button>
+  </section>
+  <section class="lcard">
+    <b style="font-weight:500">10 คนล่าสุด</b>
+    <div class="recent" id="recent"><div class="sub">ยังไม่มีคนสแกน</div></div>
+  </section>
+  <p class="sub" id="foot" style="text-align:center;margin:0"></p>
+</main>
+<div id="big" class="big" hidden></div>
+<script src="/vendor/qrcode.js"></script>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+<script>
+(async function () {
+  const { $, rpc, msg, esc, fmtTime, STAFF, qrSvg } = K;
+  const me = await STAFF.guard(['station']);
+  if (!me) return;
+  $('#out').onclick = () => STAFF.logout();
+  $('#foot').textContent = 'เข้าสู่ระบบเป็น ' + me.name + ' (' + me.code + ')';
+  const sid = new URLSearchParams(location.search).get('station');   // แอดมินเปิดดูฐานไหนก็ได้ด้วย ?station=ID
+  let url = '';
+  async function load() {
+    const r = await rpc('station_me', { p_token: me.token, p_station_id: sid ? +sid : null });
+    if (r && r.code === 'AUTH') { STAFF.logout(); return; }
+    if (!r || !r.ok) { $('#err').hidden = false; $('#err').textContent = r && r.code === 'NO_STATION' ? 'บัญชีนี้ยังไม่ได้กำหนดฐานที่ประจำ ให้แอดมินตั้งที่หน้า ตั้งค่า → ทีมงาน' : msg(r); return; }
+    $('#err').hidden = true;
+    $('#stName').textContent = 'ฐาน ' + r.sort + ' · ' + r.name + (r.active ? '' : ' (ปิดอยู่)');
+    $('#cnt').textContent = r.count;
+    $('#upd').textContent = 'อัปเดตล่าสุด ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' · รีเฟรชทุก 10 วินาที';
+    const u = location.origin + '/s.html?t=' + r.qr_token;
+    if (u !== url) { url = u; $('#qr').innerHTML = qrSvg(u, 320); }
+    $('#recent').innerHTML = r.last10.length ? r.last10.map(x => `<div><b>${esc(x.ticket_no)}</b><span>${esc(x.name)}</span><span class="sub">${fmtTime(x.at)}</span></div>`).join('') : '<div class="sub">ยังไม่มีคนสแกน</div>';
+  }
+  $('#full').onclick = () => { const b = $('#big'); b.hidden = false; b.innerHTML = `<div class="nm">${esc($('#stName').textContent)}</div>${qrSvg(url, 600)}<div class="sub">สแกนเพื่อรับแสตมป์ · แตะเพื่อปิด</div>`; b.onclick = () => { b.hidden = true; }; };
+  load(); setInterval(load, 10000);
+})();
+</script>
+</body>
+</html>

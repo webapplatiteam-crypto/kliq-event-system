@@ -137,7 +137,7 @@
       return s;
     },
     home(role) {
-      return { admin: '/admin/index.html', souvenir: '/staff/souvenir.html', mc: '/stage/index.html', register: '/admin/participants.html' }[role] || '/staff/login.html';
+      return { admin: '/admin/index.html', souvenir: '/staff/souvenir.html', mc: '/stage/index.html', register: '/admin/participants.html', station: '/staff/station.html' }[role] || '/staff/login.html';
     },
     async logout() {
       const t = STAFF.token();

@@ -67,6 +67,18 @@ check('souvenir staff cannot use admin functions', rpc('admin_stations', SV).get
 check('mc cannot import', rpc('admin_import_prereg', MC, [], False).get('code') == 'AUTH')
 check('bad token rejected', rpc('admin_stats', 'nope').get('code') == 'AUTH')
 
+# station staff: bound to one station, sees its QR + count
+check('station role needs a station', rpc('admin_staff_save', A, 'ST01', 'พี่บี', 'station', '135790', True, None).get('code') == 'NEED_STATION')
+check('create station staff', rpc('admin_staff_save', A, 'ST01', 'พี่บี', 'station', '135790', True, 2).get('ok'))
+sl = rpc('staff_login', 'ST01', '135790')
+check('station login carries station_id', sl.get('ok') and sl['role'] == 'station' and sl['station_id'] == 2, sl)
+ST = sl['token']
+sm = rpc('station_me', ST)
+check('station_me returns own station + qr token', sm.get('ok') and sm['id'] == 2 and sm['qr_token'] and sm['count'] == 0 and sm['staff'] == 'พี่บี', sm)
+check('station staff cannot use admin / souvenir functions', rpc('admin_stations', ST).get('code') == 'AUTH' and rpc('souvenir_lookup', ST, 'x').get('code') == 'AUTH')
+check('staff list shows station name', [x for x in rpc('admin_staff_list', A)['rows'] if x['code'] == 'ST01'][0]['station_name'] == 'LIGHTING SOLUTION')
+check('admin can view any station via station_me', rpc('station_me', A, 3).get('name') == 'KLIQ ROOM EXPERIENCE')
+
 # lockout after 5 fails
 for _ in range(5):
     rpc('staff_login', 'REG01', '000001')
