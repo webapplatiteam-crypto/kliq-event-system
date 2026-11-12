@@ -98,29 +98,29 @@
   const staffName = (db, id) => (db.staff.find(s => s.id === id) || {}).display_name;
   const eventInfo = db => ({ event_name: db.settings.event_name, registration_open: db.settings.registration_open && (!db.settings.cutoff_at || Date.now() < new Date(db.settings.cutoff_at)), announce_text: db.settings.announce_text, souvenir_basic_name: db.settings.souvenir_basic_name, souvenir_premium_name: db.settings.souvenir_premium_name,
     series: db.series.map(s => ({ code: s.code, name: s.name, color: s.color, tagline: s.tagline })), stations: db.stations.filter(s => s.active).length });
-  // รอบชิง v3: เปิดการ์ด 5 ใบ ตำแหน่ง 1 OUT · 2 IN (ที่ 3) · 3 IN (ที่ 2) · 4 OUT · 5 IN (ที่ 1) · รางวัลอันดับเดียวกันหลายชิ้นหมุนซ้ำจากการ์ดเดิม
+  // รอบชิง v3: เปิดการ์ด 5 ใบ ตำแหน่ง 1 OUT · 2 IN · 3 IN · 4 OUT · 5 IN แล้วเปิดว่าการ์ด IN ใบไหนเป็นที่ 3 (step 6) / ที่ 2 (step 7) / ที่ 1 (step 8) · รางวัลอันดับเดียวกันหลายชิ้นหมุนซ้ำจากการ์ดเดิม
   const finalRanks = db => [...new Set(db.prizes.filter(z => z.kind === 'final' && z.rank >= 1 && z.rank <= 3).map(z => z.rank))].sort((a, b) => b - a);
-  const finalPos = r => ({ 3: 2, 2: 3, 1: 5 })[r];
-  const finalRankAt = pos => ({ 2: 3, 3: 2, 5: 1 })[pos] || null;
-  const finalPool = (db, g, r) => eligible(db).filter(p => p.series_code === g.series_order[finalPos(r) - 1] && p.id !== g.pending_participant);
+  const finalCard = (g, r) => (g.rank_cards || [g.series_order[1], g.series_order[2], g.series_order[4]])[3 - r];
+  const revealStep = r => 5 + (4 - r);
+  const finalPool = (db, g, r) => eligible(db).filter(p => p.series_code === finalCard(g, r) && p.id !== g.pending_participant);
   const finalPrize = (db, r) => db.prizes.find(z => z.kind === 'final' && z.rank === r);
   const finalNextPrize = db => db.prizes.filter(z => z.kind === 'final' && z.rank >= 1 && z.rank <= 3 && !db.results.some(d => d.prize_id === z.id && !d.voided)).sort((a, b) => b.rank - a.rank || a.id - b.id)[0] || null;
   const finalJson = (db, g) => {
     const step = g.step, pos = c => g.series_order.indexOf(c) + 1, ranks = finalRanks(db);
     const isFinal = d => (db.prizes.find(z => z.id === d.prize_id) || {}).kind === 'final';
-    const z = finalNextPrize(db), nxt = z ? z.rank : null;
-    const phase = g.done || nxt == null ? 'done' : step < 5 ? 'cut' : 'spin';
-    const pool = step >= 5 && nxt != null ? finalPool(db, g, nxt) : [], pp = g.pending_participant && db.participants.find(x => x.id === g.pending_participant);
+    const z = finalNextPrize(db), nxt = z ? z.rank : null, revealed = nxt != null && step >= revealStep(nxt);
+    const phase = g.done || nxt == null ? 'done' : step < 5 ? 'cut' : !revealed ? 'reveal' : 'spin';
+    const pool = revealed ? finalPool(db, g, nxt) : [], pp = g.pending_participant && db.participants.find(x => x.id === g.pending_participant);
     const pz = g.pending_prize && db.prizes.find(x => x.id === g.pending_prize);
     const fin = db.results.filter(isFinal);
     const row = d => { const z2 = db.prizes.find(x => x.id === d.prize_id), p = db.participants.find(x => x.id === d.participant_id); return { rank: z2.rank, prize: z2.name, prize_id: z2.id, ticket_no: p.ticket_no, card: p.series_code, name: maskName(p.name), at: d.drawn_at }; };
     return { id: g.id, step, cuts: 5, done: g.done, phase, ranks, next_rank: g.done ? null : nxt,
       next_prize: !g.done && z ? { id: z.id, rank: z.rank, name: z.name, description: z.description || null, image: z.image || null,
         seq: db.results.filter(d => !d.voided && isFinal(d) && db.prizes.find(x => x.id === d.prize_id).rank === z.rank).length + 1, of: db.prizes.filter(x => x.kind === 'final' && x.rank === z.rank).length } : null,
-      next_card: step >= 5 && nxt != null ? g.series_order[finalPos(nxt) - 1] : null,
+      next_card: revealed ? finalCard(g, nxt) : null,
       pool_left: pool.length, pool_tickets: shuffle(pool.map(p => p.ticket_no)),
-      series: db.series.map(se => { const ps = pos(se.code); return { code: se.code, name: se.name, color: se.color, tagline: se.tagline, pos: ps, out: [1, 4].includes(ps) && step >= ps, in: [2, 3, 5].includes(ps) && step >= ps, rank: [2, 3, 5].includes(ps) && step >= ps ? finalRankAt(ps) : null, holders: eligible(db).filter(p => p.series_code === se.code).length }; }),
-      pending: pp ? { ticket_no: pp.ticket_no, name: maskName(pp.name), rank: g.pending_rank, at: g.pending_at, card: g.series_order[finalPos(g.pending_rank) - 1], prize: pz ? pz.name : null, prize_id: pz ? pz.id : null, description: pz ? pz.description || null : null, image: pz ? pz.image || null : null } : null,
+      series: db.series.map(se => { const ps = pos(se.code); return { code: se.code, name: se.name, color: se.color, tagline: se.tagline, pos: ps, out: [1, 4].includes(ps) && step >= ps, in: [2, 3, 5].includes(ps) && step >= ps, rank: [3, 2, 1].find(r => finalCard(g, r) === se.code && step >= revealStep(r)) || null, holders: eligible(db).filter(p => p.series_code === se.code).length }; }),
+      pending: pp ? { ticket_no: pp.ticket_no, name: maskName(pp.name), rank: g.pending_rank, at: g.pending_at, card: finalCard(g, g.pending_rank), prize: pz ? pz.name : null, prize_id: pz ? pz.id : null, description: pz ? pz.description || null : null, image: pz ? pz.image || null : null } : null,
       winners: fin.filter(d => !d.voided).map(row).sort((a, b) => a.rank - b.rank || a.prize_id - b.prize_id),
       noshows: fin.filter(d => d.voided && d.void_reason === 'noshow').map(d => Object.assign(row(d), { at: d.voided_at })) };
   };
@@ -209,14 +209,17 @@
       const e = eligible(db); if (!e.length) return { ok: false, code: 'NOT_ENOUGH' };
       let order, tries = 0;
       const lock = db.settings.final_order, codes = db.series.map(x => x.code);
-      if (lock && lock.length === 5 && new Set(lock).size === 5 && lock.every(c => codes.includes(c))) order = lock.slice();
+      let locked = false;
+      if (lock && lock.length === 5 && new Set(lock).size === 5 && lock.every(c => codes.includes(c))) { order = lock.slice(); locked = true; }
       else do { order = shuffle(codes); tries++; } while (tries < 50 && ![1, 2, 4].every(i => e.some(p => p.series_code === order[i])));
-      const g = { id: db.finalSeq++, series_order: order, pool_count: e.length, step: 0, pending_participant: null, pending_rank: null, pending_prize: null, pending_at: null, done: false, created_at: now() };
+      const ins = [order[1], order[2], order[4]];
+      const g = { id: db.finalSeq++, series_order: order, rank_cards: locked ? ins : shuffle(ins), pool_count: e.length, step: 0, pending_participant: null, pending_rank: null, pending_prize: null, pending_at: null, done: false, created_at: now() };
       db.finals.push(g); return FN.final_state(db, { p_token: a.p_token, p_draw_id: g.id }); },
     final_next: (db, a) => { const s = staffFrom(db, a.p_token, ['mc']); if (!s) return AUTH; const g = db.finals.find(x => x.id === a.p_draw_id); if (!g) return { ok: false, code: 'NOT_FOUND' }; if (g.done) return FN.final_state(db, { p_token: a.p_token, p_draw_id: g.id });
       if (g.step < 5) { g.step++; return FN.final_state(db, { p_token: a.p_token, p_draw_id: g.id }); }
       if (g.pending_participant) return { ok: false, code: 'PENDING' };
       const z = finalNextPrize(db); if (!z) { g.done = true; return FN.final_state(db, { p_token: a.p_token, p_draw_id: g.id }); }
+      if (g.step < revealStep(z.rank)) { g.step = revealStep(z.rank); return FN.final_state(db, { p_token: a.p_token, p_draw_id: g.id }); }
       const w = pick(finalPool(db, g, z.rank)); if (!w) return { ok: false, code: 'NOT_ENOUGH' };
       g.pending_participant = w.id; g.pending_rank = z.rank; g.pending_prize = z.id; g.pending_at = now(); return FN.final_state(db, { p_token: a.p_token, p_draw_id: g.id }); },
     final_claim: (db, a) => { const s = staffFrom(db, a.p_token, ['mc']); if (!s) return AUTH; const g = db.finals.find(x => x.id === a.p_draw_id); if (!g) return { ok: false, code: 'NOT_FOUND' }; if (!g.pending_participant) return { ok: false, code: 'NO_PENDING' };
@@ -225,7 +228,7 @@
       else db.results.push({ id: db.resultSeq++, prize_id: pz.id, participant_id: g.pending_participant, drawn_at: now(), voided: true, voided_at: now(), void_reason: 'noshow' });
       g.pending_participant = null; g.pending_rank = null; g.pending_prize = null; g.pending_at = null; if (!finalNextPrize(db)) g.done = true;
       return FN.final_state(db, { p_token: a.p_token, p_draw_id: g.id }); },
-    final_replace: (db, a) => { const s = staffFrom(db, a.p_token, ['mc']); if (!s) return AUTH; const g = db.finals[db.finals.length - 1]; if (!g || g.step < 5) return { ok: false, code: 'NOT_FOUND' };
+    final_replace: (db, a) => { const s = staffFrom(db, a.p_token, ['mc']); if (!s) return AUTH; const g = db.finals[db.finals.length - 1]; if (!g || g.step < revealStep(a.p_rank)) return { ok: false, code: 'NOT_FOUND' };
       const pz = db.prizes.filter(z => z.kind === 'final' && z.rank === a.p_rank).sort((x, y) => x.id - y.id).find(z => !db.results.some(r => r.prize_id === z.id && !r.voided));
       if (!pz) return { ok: false, code: finalPrize(db, a.p_rank) ? 'PRIZE_DONE' : 'NO_FINAL_PRIZE' }; const w = pick(finalPool(db, g, a.p_rank)); if (!w) return { ok: false, code: 'NOT_ENOUGH' };
       db.results.push({ id: db.resultSeq++, prize_id: pz.id, participant_id: w.id, drawn_at: now(), voided: false }); if (!finalNextPrize(db)) g.done = true; return { ok: true, ticket_no: w.ticket_no, name: maskName(w.name), rank: a.p_rank, prize: pz.name }; },

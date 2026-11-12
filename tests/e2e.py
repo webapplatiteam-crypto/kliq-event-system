@@ -194,14 +194,15 @@ async def main():
         for i in range(5):
             await m.keyboard.press('Space'); await m.wait_for_timeout(2500)
             if i == 0: await shot(m, '13a_final_roulette', False)
-            await m.wait_for_timeout(3000); await m.keyboard.press('Space')   # ข้ามช่วงค้าง 15 วิ
+            await m.wait_for_timeout(5500); await m.keyboard.press('Space')   # ข้ามช่วงค้าง 15 วิ (รอให้ไฟวิ่งหยุดก่อน)
             await ready()
             exp_out, exp_in = [1, 1, 1, 2, 2][i], [0, 1, 2, 2, 3][i]
             check(f'final: card {i + 1} opened -> OUT {exp_out} / IN {exp_in}', await m.locator('.scard.out').count() == exp_out and await m.locator('.scard.in').count() == exp_in)
             if i == 2: await shot(m, '13_final_cards_mid', False)
-        check('final: ladder (4 prizes) + wheel shown, rank 3 #1 next', await m.locator('#wheel').count() == 1 and await m.locator('.lad').count() == 4 and 'รางวัลที่ 3 (ชิ้นที่ 1/2)' in await m.inner_text('#go'))
+        check('final: ladder (4 prizes) + wheel shown, reveal rank-3 card next', await m.locator('#wheel').count() == 1 and await m.locator('.lad').count() == 4 and 'เปิดการ์ดรางวัลที่ 3 (ชิ้นที่ 1/2)' in await m.inner_text('#go') and await m.locator('.scard.ranked').count() == 0)
+        await m.click('#go'); await m.wait_for_timeout(7500); await m.keyboard.press('Space'); await ready()   # เปิดการ์ดรางวัลที่ 3
         card3 = await m.get_attribute('.scard.pick', 'data-code')
-        check('final: rank-3 card is the IN card opened 2nd', await m.locator(f'.scard.in[data-pos="2"][data-code="{card3}"]').count() == 1)
+        check('final: rank-3 card revealed = IN card at pos 2 (locked)', await m.locator('.scard.ranked').count() == 1 and await m.locator(f'.scard.in.ranked[data-pos="2"][data-code="{card3}"]').count() == 1 and 'หมุนวงล้อ' in await m.inner_text('#go'))
         await shot(m, '14a_final_wheel_ready', False)
         # หมุนรางวัลที่ 3 ชิ้นที่ 1 → ไม่อยู่ → หมุนใหม่ → อยู่ → ชิ้นที่ 2 → อยู่
         await m.click('#go'); await m.wait_for_timeout(3500); await shot(m, '14b_final_wheel_spinning', False)
@@ -228,7 +229,11 @@ async def main():
         await shot(m, '14e_final_rank3b_popup', False)
         await m.keyboard.press('Enter'); await m.wait_for_timeout(3800); await ready()
         for rank in (2, 1):
-            check(f'final: rank {rank} card = IN card opened at pos {({2: 3, 1: 5})[rank]}', await m.get_attribute('.scard.pick', 'data-pos') == str({2: 3, 1: 5}[rank]))
+            check(f'final: rank {rank} needs card reveal first', 'เปิดการ์ดรางวัลที่ ' + str(rank) in await m.inner_text('#go'))
+            await m.click('#go'); await m.wait_for_timeout(7500 if rank == 2 else 1500)
+            if rank == 2: await m.keyboard.press('Space')   # ปล่อยช่วงค้าง (ใบสุดท้ายไม่มีช่วงค้าง)
+            await ready()
+            check(f'final: rank {rank} card = IN card opened at pos {({2: 3, 1: 5})[rank]}', await m.get_attribute('.scard.pick', 'data-pos') == str({2: 3, 1: 5}[rank]) and await m.locator('.scard.ranked').count() == 4 - rank, (await m.get_attribute('.scard.pick', 'data-pos'), await m.locator('.scard.ranked').count(), await m.inner_text('#go')))
             await m.click('#go'); await m.wait_for_selector('#yes', timeout=20000)
             await shot(m, f'14e_final_rank{rank}_popup', False)
             if rank == 1: check('rank 1 popup shows prize image + description', await m.locator('.mbox .mi').count() == 1 and 'Deep Blue' in await m.inner_text('.mbox .pd'))

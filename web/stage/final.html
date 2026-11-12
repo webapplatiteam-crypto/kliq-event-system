@@ -229,30 +229,31 @@
     }
     // รอบรางวัล: การ์ดแถวบน + บันไดรางวัล + วงล้อ
     const card = (draw.next_card && draw.series.find(s => s.code === draw.next_card)) || { name: '' };
-    setHead(draw.done ? 'ขอแสดงความยินดีกับผู้โชคดีทุกท่าน!' : `${prizeLabel(np)} · ${np ? np.name : ''} · ผู้ถือการ์ด ${card.name} ${draw.pool_left} ท่านลุ้น`);
+    const unranked = draw.series.filter(s => s.in && !s.rank).length;
+    setHead(draw.done ? 'ขอแสดงความยินดีกับผู้โชคดีทุกท่าน!' : ph === 'reveal' ? `${prizeLabel(np)} · ${np ? np.name : ''} · เปิดการ์ด 1 ใน ${unranked} ใบที่เข้ารอบ` : `${prizeLabel(np)} · ${np ? np.name : ''} · ผู้ถือการ์ด ${card.name} ${draw.pool_left} ท่านลุ้น`);
     const won = Object.fromEntries((draw.winners || []).map(w => [w.prize_id, w]));
     const cardName = k => { const c = draw.series.find(s => s.rank === k); return c ? c.name : ''; };
     $('#stagebody').innerHTML = cardsHTML(draw.series, true) + `
       <div class="wheelwrap">
         <div class="ladder" id="ladder">${finals.map(z => { const w = won[z.id], now = np && np.id === z.id, many = prizesOf(z.rank).length > 1, seq = prizesOf(z.rank).indexOf(z) + 1; return `<div class="lad ${w ? 'won' : now ? 'now' : ''} ${w && z.rank === 1 ? 'first' : ''}" data-prize="${z.id}">
             <div class="r">${z.rank}</div>${imgTag(z.image, 'li')}<div style="flex:1;display:flex;flex-direction:column;gap:2px"><div class="pz">รางวัลที่ ${z.rank}${many ? ` (ชิ้นที่ ${seq}/${prizesOf(z.rank).length})` : ''} · ${esc(z.name)}</div>${z.description ? `<div class="st">${esc(z.description)}</div>` : ''}
-            ${w ? `<div class="wn">${esc(w.ticket_no)}</div><div class="st">${esc(w.name)} · การ์ด ${esc(cardName(z.rank))} · รับรางวัลแล้ว</div>` : `<div class="st">${now ? 'การ์ด ' + esc(card.name) + ' · กำลังจะหมุน' : 'การ์ด ' + esc(cardName(z.rank)) + ' · รอ'}</div>`}</div></div>`; }).join('')}
+            ${w ? `<div class="wn">${esc(w.ticket_no)}</div><div class="st">${esc(w.name)} · การ์ด ${esc(cardName(z.rank))} · รับรางวัลแล้ว</div>` : `<div class="st">${now ? (ph === 'reveal' ? 'รอเปิดการ์ด' : 'การ์ด ' + esc(card.name) + ' · กำลังจะหมุน') : cardName(z.rank) ? 'การ์ด ' + esc(cardName(z.rank)) + ' · รอ' : 'รอเปิดการ์ด'}</div>`}</div></div>`; }).join('')}
           ${(draw.noshows || []).length ? `<div class="noshow">ไม่อยู่ในงาน (ตัดสิทธิ์): ${draw.noshows.map(x => esc(x.ticket_no)).join(' · ')}</div>` : ''}
         </div>
         <div class="wheelbox idle" id="wheelbox"><div class="pin"></div><canvas id="wheel"></canvas><div class="hub">KLIQ</div></div>
       </div>`;
     Wheel.canvas = $('#wheel'); Wheel.rot = 0; fitWheel(); Wheel.build(draw.pool_tickets || []);
-    go.textContent = draw.done ? 'ประกาศผลครบแล้ว' : `หมุนวงล้อ · ${prizeLabel(np)} · การ์ด ${card.name}`; go.disabled = draw.done;
+    go.textContent = draw.done ? 'ประกาศผลครบแล้ว' : ph === 'reveal' ? `เปิดการ์ด${prizeLabel(np)}` : `หมุนวงล้อ · ${prizeLabel(np)} · การ์ด ${card.name}`; go.disabled = draw.done;
     if (draw.pending) { openModal(draw.pending, justSpun); justSpun = false; }
   }
 
   function cardsHTML(series, mini) {
-    const cur = draw && draw.next_card, spin = draw && draw.phase !== 'cut';
-    return `<div class="cards5 ${mini ? 'mini' : ''}">${series.map(s => `<div class="scard ${s.out ? 'out' : ''} ${s.in ? 'in' : ''} ${s.rank && spin ? 'ranked' : ''} ${s.code === cur && !draw.done ? 'pick' : ''}" data-code="${esc(s.code)}" data-pos="${s.pos || ''}" style="background:${esc(s.color)};color:${inkFor(s.code)}">
-      ${s.rank && spin ? `<div class="rkb">รางวัลที่ ${s.rank}</div>` : s.in ? `<div class="rkb">IN · เข้ารอบ</div>` : ''}
-      ${s.out ? '<div class="stamp still">OUT</div>' : s.in && !spin ? '<div class="stamp gold still">IN</div>' : ''}
+    const cur = draw && draw.next_card;
+    return `<div class="cards5 ${mini ? 'mini' : ''}">${series.map(s => `<div class="scard ${s.out ? 'out' : ''} ${s.in ? 'in' : ''} ${s.rank ? 'ranked' : ''} ${s.code === cur && !draw.done ? 'pick' : ''}" data-code="${esc(s.code)}" data-pos="${s.pos || ''}" style="background:${esc(s.color)};color:${inkFor(s.code)}">
+      ${s.rank ? `<div class="rkb">รางวัลที่ ${s.rank}</div>` : s.in ? `<div class="rkb">IN · เข้ารอบ</div>` : ''}
+      ${s.out ? '<div class="stamp still">OUT</div>' : s.in && !s.rank ? '<div class="stamp gold still">IN</div>' : ''}
       <img src="${seriesImg(s.code, 'p')}" alt="สวิตช์ KLIQ ${esc(s.name)}"><div class="nm">${esc(s.name)}</div><div class="tg">${esc(s.tagline || '')}</div>
-      <div class="tg">${s.out ? 'คัดออกแล้ว' : s.rank && spin ? esc(prizeName(s.rank)) : mini ? (s.holders != null ? s.holders + ' ท่าน' : '') : ''}</div></div>`).join('')}</div>`;
+      <div class="tg">${s.out ? 'คัดออกแล้ว' : s.rank ? esc(prizeName(s.rank)) : mini ? (s.holders != null ? s.holders + ' ท่าน' : '') : ''}</div></div>`).join('')}</div>`;
   }
 
   // ---------- ป๊อปอัปผู้โชคดี + นับถอยหลัง ----------
@@ -343,9 +344,20 @@
       gong(); setHead('การ์ด ' + opened.name + ' … เข้ารอบ หรือ ตกรอบ?', true); await hold(HOLD_MS);   // ค้างให้พิธีกรพูด
       if (kind === 'out') { setHead('การ์ด ' + opened.name + ' ตกรอบ!'); await eliminate(target); }
       else { setHead('การ์ด ' + opened.name + ' เข้ารอบ!'); await admit(target, 'IN'); }
-      if (last) { const ins = next.series.filter(s => s.in).sort((a, b) => a.rank - b.rank); $$('.scard.in').forEach(e => e.classList.add('win')); fanfare(); confetti(360, true);
-        setHead('เข้ารอบ 3 การ์ด: ' + ins.map(s => s.name + ' = รางวัลที่ ' + s.rank).join(' · ')); await sleep(4200); }
+      if (last) { const ins = next.series.filter(s => s.in); $$('.scard.in').forEach(e => e.classList.add('win')); fanfare(); confetti(360, true);
+        setHead('เข้ารอบ 3 การ์ด: ' + ins.map(s => s.name).join(' · ') + ' · ทุกใบมีรางวัล!'); await sleep(4200); }
       return;
+    }
+    if (prev.phase === 'reveal' && next.next_card) {         // เปิดว่าการ์ด IN ใบไหนเป็นรางวัลนี้
+      const r = next.next_rank, np = next.next_prize || {};
+      const live = $$('.scard.in:not(.ranked)'), target = live.find(e => e.dataset.code === next.next_card);
+      const nm = next.series.find(s => s.code === next.next_card).name;
+      if (!target) return;
+      if (live.length > 1) { setHead(`รางวัลที่ ${r} · ${prizeName(r)} · การ์ดใบไหน?`, true); drumroll(3600); riser(3600); await roulette(live, target, 3600);
+        gong(); setHead(`การ์ด ${nm} … ได้รางวัลที่ ${r} หรือไม่?`, true); await hold(HOLD_MS); }
+      else { target.classList.add('spot'); await sleep(600); }
+      target.classList.remove('spot'); target.classList.add('flash', 'pick'); const old = target.querySelector('.stamp'); if (old) old.remove(); stamp(target, 'รางวัลที่ ' + r, true); r === 1 ? fanfare() : sting(); confetti(160, true);
+      setHead(`รางวัลที่ ${r} · ${prizeName(r)} ไปที่ผู้ถือการ์ด ${nm}!`); await sleep(2600); return;
     }
     if (next.pending && !prev.pending) {                     // หมุนวงล้อ
       const pd = next.pending, np = next.next_prize || {}; setHead(`${prizeLabel(np)} · ${pd.prize || ''} · วงล้อกำลังหมุน…`, true);

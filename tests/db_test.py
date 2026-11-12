@@ -222,15 +222,19 @@ check('next prize = first rank-3 prize (1 of 2)', f['next_prize']['rank'] == 3 a
 again = rpc('final_create', MC)['draw']
 check('create again returns same in-progress draw', again['id'] == f['id'])
 check('claim before spin rejected', rpc('final_claim', MC, f['id'], True).get('code') == 'NO_PENDING')
-expect = [('U', 'out', None), ('I', 'in', 3), ('F', 'in', 2), ('N', 'out', None), ('C', 'in', 1)]
-for i, (code, kind, rank) in enumerate(expect, 1):
+expect = [('U', 'out'), ('I', 'in'), ('F', 'in'), ('N', 'out'), ('C', 'in')]
+for i, (code, kind) in enumerate(expect, 1):
     f = rpc('final_next', MC, f['id'])['draw']
     c = [x for x in f['series'] if x['code'] == code][0]
-    check(f'open card {i}: {code} is {kind.upper()}' + (f' rank {rank}' if rank else ''), f['step'] == i and c['out'] == (kind == 'out') and c['in'] == (kind == 'in') and c['rank'] == rank and c['pos'] == i, f['series'])
-    check(f'after card {i}: phase ' + ('cut' if i < 5 else 'spin'), f['phase'] == ('cut' if i < 5 else 'spin'))
-check('outs not adjacent: cards 1 and 4', [x['code'] for x in f['series'] if x['out']] == ['U', 'N'] and sorted(x['rank'] for x in f['series'] if x['in']) == [1, 2, 3])
+    check(f'open card {i}: {code} is {kind.upper()}, no rank yet', f['step'] == i and c['out'] == (kind == 'out') and c['in'] == (kind == 'in') and c['rank'] is None and c['pos'] == i, f['series'])
+    check(f'after card {i}: phase ' + ('cut' if i < 5 else 'reveal'), f['phase'] == ('cut' if i < 5 else 'reveal'))
+check('outs not adjacent: cards 1 and 4; 3 IN unranked', [x['code'] for x in f['series'] if x['out']] == ['U', 'N'] and [x['code'] for x in f['series'] if x['in']] == ['I', 'F', 'C'] and not any(x['rank'] for x in f['series']))
+check('reveal phase: rank 3 next, card hidden, no pool', f['next_rank'] == 3 and f['next_card'] is None and f['pool_tickets'] == [] and f['pool_left'] == 0, f)
+check('spin before reveal is a reveal, not a spin', rpc('final_next', MC, f['id'])['draw']['pending'] is None)
+f = rpc('final_state', MC)['draw']
 card3 = f['next_card']
-check('rank 3 card = IKON, wheel pool = its holders', card3 == 'I' and f['pool_left'] > 0 and all(t.startswith('I-') for t in f['pool_tickets']) and len(f['pool_tickets']) == f['pool_left'], f)
+check('rank 3 card revealed = IKON (locked), step 6, phase spin', f['step'] == 6 and f['phase'] == 'spin' and card3 == 'I' and [x['code'] for x in f['series'] if x['rank'] == 3] == ['I'] and f['pool_left'] > 0 and all(t.startswith('I-') for t in f['pool_tickets']) and len(f['pool_tickets']) == f['pool_left'], f)
+check('other IN cards still unranked', [x['rank'] for x in f['series'] if x['code'] in ('F', 'C')] == [None, None])
 f = rpc('final_next', MC, f['id'])['draw']
 check('spin rank 3: pending person from card 3, prize = Beyerdynamic', f['pending'] and f['pending']['rank'] == 3 and f['pending']['card'] == card3 and f['pending']['ticket_no'].startswith('I-') and '**' in f['pending']['name'] and f['pending']['prize_id'] == first3['id'], f.get('pending'))
 first = f['pending']['ticket_no']
@@ -245,15 +249,16 @@ f = rpc('final_next', MC, f['id'])['draw']
 check('re-spin picks a different person, same card', f['pending'] and f['pending']['ticket_no'] != first and f['pending']['ticket_no'].startswith('I-'), f.get('pending'))
 f = rpc('final_claim', MC, f['id'], True)['draw']
 w1 = f['winners'][0]['ticket_no']
-check('rank 3 #1 awarded, next = rank 3 #2 (KEF) on same card', len(f['winners']) == 1 and f['winners'][0]['rank'] == 3 and f['winners'][0]['prize_id'] == first3['id'] and f['next_rank'] == 3 and f['next_prize']['id'] == finals[3]['id'] and f['next_prize']['seq'] == 2 and f['next_card'] == card3 and f['phase'] == 'spin', f)
+check('rank 3 #1 awarded, next = rank 3 #2 (KEF) on same card, no reveal needed', len(f['winners']) == 1 and f['winners'][0]['rank'] == 3 and f['winners'][0]['prize_id'] == first3['id'] and f['next_rank'] == 3 and f['next_prize']['id'] == finals[3]['id'] and f['next_prize']['seq'] == 2 and f['next_card'] == card3 and f['phase'] == 'spin', f)
 f = rpc('final_next', MC, f['id'])['draw']
 check('second rank-3 spin: different person, same card', f['pending'] and f['pending']['ticket_no'] not in (first, w1) and f['pending']['ticket_no'].startswith('I-') and f['pending']['prize_id'] == finals[3]['id'], f.get('pending'))
 f = rpc('final_claim', MC, f['id'], True)['draw']
-check('both rank-3 prizes awarded, next rank 2', len(f['winners']) == 2 and f['next_rank'] == 2 and f['next_card'] == 'F', f)
+check('both rank-3 prizes awarded, rank 2 needs reveal', len(f['winners']) == 2 and f['next_rank'] == 2 and f['phase'] == 'reveal' and f['next_card'] is None, f)
 cards = {3: card3}
 for rank in (2, 1):
+    f = rpc('final_next', MC, f['id'])['draw']   # เปิดการ์ดของรางวัลนี้
     cards[rank] = f['next_card']
-    check(f'locked order: rank {rank} card = ' + {2: 'FORMA', 1: 'CASA'}[rank], cards[rank] == {2: 'F', 1: 'C'}[rank] and all(t.startswith(cards[rank] + '-') for t in f['pool_tickets']), f)
+    check(f'rank {rank} card revealed = ' + {2: 'FORMA', 1: 'CASA'}[rank] + f' (step {5 + 4 - rank})', f['phase'] == 'spin' and f['step'] == 5 + 4 - rank and cards[rank] == {2: 'F', 1: 'C'}[rank] and all(t.startswith(cards[rank] + '-') for t in f['pool_tickets']), f)
     f = rpc('final_next', MC, f['id'])['draw']
     check(f'spin rank {rank}', f['pending'] and f['pending']['rank'] == rank and f['pending']['ticket_no'].startswith(cards[rank] + '-'), f.get('pending'))
     f = rpc('final_claim', MC, f['id'], True)['draw']

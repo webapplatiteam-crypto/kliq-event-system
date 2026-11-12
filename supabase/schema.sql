@@ -158,7 +158,7 @@ create table if not exists grand_draws (
 --     หมุนวงล้อสุ่มคนจากผู้ถือการ์ดใบนั้น (แต่ละรางวัลจึงคนละ SKU) ผู้ถูกเรียกต้องยืนยันว่าอยู่ในงาน ไม่อยู่ = สุ่มใหม่
 create table if not exists final_draws (
   id                  serial primary key,
-  series_order        text[] not null,          -- ลำดับเปิดการ์ด: ตำแหน่ง 1=OUT 2=IN(รางวัลที่ 3) 3=IN(รางวัลที่ 2) 4=OUT 5=IN(รางวัลที่ 1)
+  series_order        text[] not null,          -- ลำดับเปิดการ์ด: ตำแหน่ง 1=OUT 2=IN 3=IN 4=OUT 5=IN (การ์ด IN ยังไม่รู้อันดับ ดู rank_cards)
   pool_count          int not null,             -- (ไม่ใช้แล้ว เก็บไว้เพื่อความเข้ากันได้)
   step                int not null default 0,   -- จำนวนการ์ดที่เปิดแล้ว (คัดออก + เปิดให้รางวัล) 0..5
   pending_participant uuid references participants(id),   -- คนที่วงล้อหยุด รอยืนยันว่าอยู่ในงาน
@@ -175,6 +175,7 @@ alter table final_draws add column if not exists pending_participant uuid refere
                         add column if not exists pending_at timestamptz;
 alter table final_draws alter column pool_count set default 0;
 alter table final_draws add column if not exists pending_prize int references prizes(id);
+alter table final_draws add column if not exists rank_cards text[];   -- [การ์ดรางวัลที่ 3, ที่ 2, ที่ 1] สุ่มจากการ์ด IN ตอนเริ่ม เปิดทีละใบ
 alter table settings alter column min_stamp_interval_sec set default 0;
 update settings set min_stamp_interval_sec = 0 where id = 1 and min_stamp_interval_sec = 180;   -- ค่าเดิมของเวอร์ชันก่อน → สแกนฐานถัดไปได้ทันที
 
@@ -756,8 +757,7 @@ end $$;
 -- ---------------------------------------------------------------------
 -- รอบชิงรางวัลใหญ่ (Final)
 -- เปิดการ์ดทีละใบ 5 ครั้ง (สุ่มว่าใบไหน): ใบที่ 1 OUT · ใบที่ 2 IN · ใบที่ 3 IN · ใบที่ 4 OUT · ใบที่ 5 IN
--- การ์ด IN ใบแรก = รางวัลที่ 3, ใบที่สอง = รางวัลที่ 2, ใบสุดท้าย = รางวัลที่ 1
--- แล้วหมุนวงล้อทีละรางวัล 3 → 2 → 1 (อันดับที่มีหลายชิ้น เช่น ที่ 3 สองชิ้น หมุนซ้ำจากการ์ดใบเดียวกัน)
+-- จากนั้นเปิดว่าการ์ด IN ใบไหนเป็นรางวัลที่ 3 (step 6) → หมุนวงล้อ → ใบไหนเป็นรางวัลที่ 2 (step 7) → หมุน → ใบสุดท้าย = รางวัลที่ 1 (step 8) → หมุน (อันดับที่มีหลายชิ้น เช่น ที่ 3 สองชิ้น หมุนซ้ำจากการ์ดใบเดียวกัน)
 -- ผลทั้งหมดสุ่มและล็อกไว้ตั้งแต่กดเริ่ม กดซ้ำหรือรีเฟรชไม่เปลี่ยนผล
 -- ---------------------------------------------------------------------
 drop function if exists draw_grand_create(text, int);
@@ -771,10 +771,13 @@ language sql stable set search_path = public as $$
 $$;
 
 -- ตำแหน่งการ์ดของรางวัลที่ r ใน series_order (IN ใบแรก=ที่ 3, ใบสอง=ที่ 2, ใบสุดท้าย=ที่ 1)
-create or replace function _final_pos(r int) returns int
-language sql immutable as $$ select case r when 3 then 2 when 2 then 3 when 1 then 5 end; $$;
-create or replace function _final_rank_at(pos int) returns int
-language sql immutable as $$ select case pos when 2 then 3 when 3 then 2 when 5 then 1 end; $$;
+drop function if exists _final_pos(int);
+drop function if exists _final_rank_at(int);
+-- การ์ดของรางวัลที่ r (rank_cards[1]=ที่ 3, [2]=ที่ 2, [3]=ที่ 1) · เปิดให้เห็นเมื่อ step >= 5 + (4 - r)
+create or replace function _final_card(g final_draws, r int) returns text
+language sql immutable as $$ select (coalesce(g.rank_cards, array[g.series_order[2], g.series_order[3], g.series_order[5]]))[4 - r]; $$;   -- รอบเก่าที่ไม่มี rank_cards ใช้ตำแหน่ง 2/3/5
+create or replace function _final_reveal_step(r int) returns int
+language sql immutable as $$ select 5 + (4 - r); $$;
 
 -- รางวัลชิ้นถัดไปที่ยังไม่มีผู้รับ (อันดับท้ายสุดก่อน ชิ้นที่สร้างก่อนก่อน)
 create or replace function _final_next_prize() returns prizes
@@ -787,16 +790,17 @@ $$;
 -- ผู้มีสิทธิ์ของรางวัลที่ r: ถือการ์ดใบที่เปิดให้รางวัลนั้น ยังไม่เคยถูกเรียก (รับแล้ว/ไม่อยู่ ไม่ถูกสุ่มซ้ำ)
 create or replace function _final_pool(g final_draws, r int) returns setof participants
 language sql stable set search_path = public as $$
-  select e.* from _eligible() e where e.series_code = g.series_order[_final_pos(r)]
+  select e.* from _eligible() e where e.series_code = _final_card(g, r)
      and e.id is distinct from g.pending_participant;
 $$;
 
 create or replace function _final_json(g final_draws) returns jsonb
 language plpgsql stable set search_path = public as $$
-declare ranks int[] := _final_ranks(); z prizes; nxt int; pp participants; phase text; pz prizes;
+declare ranks int[] := _final_ranks(); z prizes; nxt int; pp participants; phase text; pz prizes; revealed boolean;
 begin
   z := _final_next_prize(); nxt := z.rank;
-  phase := case when g.done or nxt is null then 'done' when g.step < 5 then 'cut' else 'spin' end;
+  revealed := nxt is not null and g.step >= _final_reveal_step(nxt);
+  phase := case when g.done or nxt is null then 'done' when g.step < 5 then 'cut' when not revealed then 'reveal' else 'spin' end;
   if g.pending_participant is not null then select * into pp from participants where id = g.pending_participant; end if;
   if g.pending_prize is not null then select * into pz from prizes where id = g.pending_prize; end if;
   return jsonb_build_object(
@@ -805,19 +809,19 @@ begin
     'next_prize', case when not g.done and z.id is not null then jsonb_build_object('id', z.id, 'rank', z.rank, 'name', z.name, 'description', z.description, 'image', z.image,
         'seq', (select count(*) + 1 from draw_results d join prizes y on y.id = d.prize_id where y.kind = 'final' and y.rank = z.rank and not d.voided),
         'of', (select count(*) from prizes y where y.kind = 'final' and y.rank = z.rank)) end,
-    'next_card', case when g.step >= 5 and nxt is not null then g.series_order[_final_pos(nxt)] end,
-    'pool_left', case when g.step >= 5 and nxt is not null then (select count(*) from _final_pool(g, nxt)) else 0 end,
-    'pool_tickets', case when g.step >= 5 and nxt is not null then (select coalesce(jsonb_agg(ticket_no order by random()), '[]'::jsonb) from _final_pool(g, nxt)) else '[]'::jsonb end,
+    'next_card', case when revealed then _final_card(g, nxt) end,
+    'pool_left', case when revealed then (select count(*) from _final_pool(g, nxt)) else 0 end,
+    'pool_tickets', case when revealed then (select coalesce(jsonb_agg(ticket_no order by random()), '[]'::jsonb) from _final_pool(g, nxt)) else '[]'::jsonb end,
     'series', (select jsonb_agg(jsonb_build_object(
         'code', se.code, 'name', se.name, 'color', se.color, 'tagline', se.tagline, 'pos', pos,
         'out', pos in (1, 4) and g.step >= pos,
         'in', pos in (2, 3, 5) and g.step >= pos,
-        'rank', case when pos in (2, 3, 5) and g.step >= pos then _final_rank_at(pos) end,
+        'rank', (select r from unnest(array[3, 2, 1]) r where _final_card(g, r) = se.code and g.step >= _final_reveal_step(r) limit 1),
         'holders', (select count(*) from _eligible() e where e.series_code = se.code)) order by se.sort)
        from (select se.*, coalesce(array_position(g.series_order, se.code), 9) as pos from series se) se),
     'pending', case when pp.id is null then null else jsonb_build_object(
         'ticket_no', pp.ticket_no, 'name', _mask_name(pp.name), 'rank', g.pending_rank, 'at', g.pending_at,
-        'card', g.series_order[_final_pos(g.pending_rank)],
+        'card', _final_card(g, g.pending_rank),
         'prize', pz.name, 'prize_id', pz.id, 'description', pz.description, 'image', pz.image) end,
     'winners', (select coalesce(jsonb_agg(jsonb_build_object('rank', z2.rank, 'prize', z2.name, 'prize_id', z2.id, 'ticket_no', p.ticket_no, 'card', p.series_code,
                   'name', _mask_name(p.name), 'at', d.drawn_at) order by z2.rank, z2.id), '[]'::jsonb)
@@ -869,8 +873,9 @@ begin
   if ord is not null and array_length(ord, 1) = 5
      and (select count(distinct x) from unnest(ord) x) = 5
      and not exists (select 1 from unnest(ord) x where x not in (select code from series)) then
-    insert into final_draws (series_order, pool_count, created_by) values (ord, (select count(*) from _eligible()), s.id) returning * into g;
-    insert into audit_log (staff_id, action, detail) values (s.id, 'final_create', jsonb_build_object('draw', g.id, 'order', ord, 'locked', true));
+    -- ล็อก: ตำแหน่ง IN 2, 3, 5 = การ์ดรางวัลที่ 3, 2, 1 ตามที่แอดมินตั้ง
+    insert into final_draws (series_order, rank_cards, pool_count, created_by) values (ord, array[ord[2], ord[3], ord[5]], (select count(*) from _eligible()), s.id) returning * into g;
+    insert into audit_log (staff_id, action, detail) values (s.id, 'final_create', jsonb_build_object('draw', g.id, 'order', ord, 'ranks', g.rank_cards, 'locked', true));
     return final_state(p_token, g.id);
   end if;
   -- สุ่มลำดับการ์ด โดยพยายามให้การ์ด IN (ตำแหน่ง 2, 3, 5) มีผู้มีสิทธิ์อย่างน้อย 1 คน
@@ -881,8 +886,10 @@ begin
     tries := tries + 1;
     exit when okay or tries >= 50;
   end loop;
-  insert into final_draws (series_order, pool_count, created_by) values (ord, (select count(*) from _eligible()), s.id) returning * into g;
-  insert into audit_log (staff_id, action, detail) values (s.id, 'final_create', jsonb_build_object('draw', g.id, 'order', ord));
+  -- สุ่มว่าการ์ด IN ใบไหนเป็นรางวัลที่ 3 / 2 / 1 (เปิดทีละใบบนเวที)
+  insert into final_draws (series_order, rank_cards, pool_count, created_by)
+  values (ord, (select array_agg(c order by random()) from unnest(array[ord[2], ord[3], ord[5]]) c), (select count(*) from _eligible()), s.id) returning * into g;
+  insert into audit_log (staff_id, action, detail) values (s.id, 'final_create', jsonb_build_object('draw', g.id, 'order', ord, 'ranks', g.rank_cards));
   return final_state(p_token, g.id);
 end $$;
 
@@ -905,6 +912,11 @@ begin
   if g.pending_participant is not null then return jsonb_build_object('ok', false, 'code', 'PENDING'); end if;
   z := _final_next_prize();
   if z.id is null then update final_draws set done = true where id = g.id; return final_state(p_token, g.id); end if;
+  if g.step < _final_reveal_step(z.rank) then                              -- เปิดว่าการ์ดใบไหนเป็นรางวัลนี้
+    update final_draws set step = _final_reveal_step(z.rank) where id = g.id;
+    insert into audit_log (staff_id, action, detail) values (s.id, 'final_reveal', jsonb_build_object('draw', g.id, 'rank', z.rank, 'card', _final_card(g, z.rank)));
+    return final_state(p_token, g.id);
+  end if;
   select * into w from _final_pool(g, z.rank) order by random() limit 1;   -- หมุนวงล้อ
   if w.id is null then return jsonb_build_object('ok', false, 'code', 'NOT_ENOUGH'); end if;
   update final_draws set pending_participant = w.id, pending_rank = z.rank, pending_prize = z.id, pending_at = now() where id = g.id;
@@ -947,7 +959,7 @@ begin
   if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
   perform pg_advisory_xact_lock(42002);
   select * into g from final_draws order by id desc limit 1;
-  if g.id is null or g.step < 5 then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  if g.id is null or g.step < _final_reveal_step(p_rank) then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
   select z.id into pz from prizes z where z.kind = 'final' and z.rank = p_rank
      and not exists (select 1 from draw_results d where d.prize_id = z.id and not d.voided) order by z.id limit 1;
   if pz is null then
