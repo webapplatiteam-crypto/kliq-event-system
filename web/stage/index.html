@@ -33,7 +33,7 @@
   const fin = pz.rows.filter(z => z.kind === 'final').sort((a, b) => a.rank - b.rank);
   const finDone = fin.length && fin.every(z => z.won >= 1);
   $('#list').innerHTML = (fin.length ? `<a href="/stage/final.html" class="card" style="text-decoration:none;color:var(--ink);border:1px solid var(--gold);grid-column:1/-1">
-    <span class="eyebrow">GRAND FINAL · เปิดการ์ด 5 ใบ (OUT · IN · OUT · IN · IN) → หมุนวงล้อ รางวัลที่ 3 · 3 · 2 · 1</span>
+    <span class="eyebrow">GRAND FINAL · เปิดการ์ด 5 ใบ (OUT · IN · IN · OUT · IN) → หมุนวงล้อ รางวัลที่ 3 · 3 · 2 · 1</span>
     <b style="font-size:30px;font-weight:500">รอบชิงรางวัลใหญ่</b>
     <span class="muted">${fin.map(z => 'ที่ ' + z.rank + ' ' + esc(z.name)).join(' · ')}${finDone ? ' · ประกาศผลแล้ว' : ''}</span></a>` : `<div class="notice err">ยังไม่ได้ตั้งรางวัลรอบชิง ไปที่หลังบ้าน → Lucky Draw</div>`);
 })();

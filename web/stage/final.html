@@ -40,16 +40,16 @@
   .stamp.gold { color:var(--gold); border-color:var(--gold); background:rgba(0,0,0,.45) }
   @keyframes stampin { 0% { opacity:0; transform:translate(-50%,-50%) rotate(-14deg) scale(3) } 60% { opacity:1; transform:translate(-50%,-50%) rotate(-12deg) scale(.92) } 100% { opacity:1; transform:translate(-50%,-50%) rotate(-12deg) scale(1) } }
   /* วงล้อ */
-  .wheelwrap { flex:1; display:grid; grid-template-columns:minmax(260px,1fr) auto; gap:3vw; align-items:center }
-  .ladder { display:flex; flex-direction:column; gap:1.4vh }
-  .lad { border-radius:18px; padding:1.6vh 1.4vw; border:1px solid var(--goldline); background:rgba(28,28,28,.85); display:flex; align-items:center; gap:1.2vw; transition:all .5s }
+  .wheelwrap { flex:1; min-height:0; display:grid; grid-template-columns:minmax(260px,1fr) auto; gap:3vw; align-items:center }
+  .ladder { display:flex; flex-direction:column; gap:1.2vh; max-height:100%; overflow:hidden }
+  .lad { border-radius:18px; padding:1.1vh 1.4vw; border:1px solid var(--goldline); background:rgba(28,28,28,.85); display:flex; align-items:center; gap:1.2vw; transition:all .5s }
   .lad .r { width:clamp(44px,4vw,72px); height:clamp(44px,4vw,72px); border-radius:50%; border:2px solid var(--goldline); display:flex; align-items:center; justify-content:center; font-size:clamp(18px,1.6vw,30px); font-weight:500; color:var(--gold); flex:none }
   .lad .pz { font-size:clamp(15px,1.3vw,24px) } .lad .wn { font-size:clamp(20px,2vw,40px); font-weight:400; letter-spacing:2px; line-height:1.1 } .lad .st { font-size:clamp(12px,1vw,18px); color:var(--ink3) }
   .lad.now { border-color:var(--gold); box-shadow:0 0 50px rgba(201,160,99,.35) } .lad.now .r { background:var(--gold); color:#121212; border-color:var(--gold) }
   .lad.won { background:linear-gradient(135deg,#C9A063,#E6C78A); color:#121212; border-color:transparent } .lad.won .r { background:#121212; color:var(--gold); border-color:#121212 } .lad.won .st { color:#3A2C14 }
   .lad.first { box-shadow:0 0 90px rgba(201,160,99,.7) }
   .noshow { font-size:clamp(12px,1vw,16px); color:var(--ink4); line-height:1.6 }
-  .wheelbox { position:relative; width:min(44vh,36vw); height:min(44vh,36vw); margin:0 auto }
+  .wheelbox { position:relative; width:min(50vh,36vw); height:min(50vh,36vw); margin:0 auto }
   .wheelbox canvas { width:100%; height:100%; display:block; border-radius:50%; box-shadow:0 0 0 10px #1B1915, 0 0 0 13px var(--gold), 0 0 120px rgba(201,160,99,.35) }
   .wheelbox.idle canvas { animation:idle 40s linear infinite } @keyframes idle { to { transform:rotate(360deg) } }
   .pin { position:absolute; left:50%; top:-26px; transform:translateX(-50%); width:0; height:0; border-left:22px solid transparent; border-right:22px solid transparent; border-top:52px solid var(--gold); filter:drop-shadow(0 4px 8px rgba(0,0,0,.6)); z-index:3 }
@@ -115,7 +115,7 @@
   const prizeName = r => prizesOf(r).map(p => p.name).join(' + ') || ('รางวัลที่ ' + r);
   const prizeLabel = z => !z ? '' : `รางวัลที่ ${z.rank}` + (z.of > 1 ? ` (ชิ้นที่ ${z.seq}/${z.of})` : '');
   const imgTag = (src, cls) => src ? `<img class="${cls}" src="${src}" alt="">` : '';
-  const OPEN_KIND = [null, 'out', 'in', 'out', 'in', 'in'];        // ผลของการเปิดใบที่ 1..5 (ล็อกตามกติกา · สุ่มว่าใบไหน)
+  const OPEN_KIND = [null, 'out', 'in', 'in', 'out', 'in'];        // ผลของการเปิดใบที่ 1..5 (ล็อกตามกติกา · สุ่มว่าใบไหน)
 
   // ---------- เสียง (สร้างด้วย WebAudio ไม่ต้องมีไฟล์) ----------
   const SND = { on: K.LS.get('kliq_snd') !== '0', ctx: null, noise: null };
@@ -179,7 +179,7 @@
   // ---------- วงล้อ ----------
   const Wheel = {
     labels: [], rot: 0, canvas: null,
-    build(pool) { let l = pool.slice(0, 20); if (l.length && l.length < 6) { while (l.length < 6) l = l.concat(pool.slice(0, 6 - l.length)); } this.labels = l.length ? l : ['—']; this.draw(); },
+    build(pool) { let l = pool.slice(0, 100); if (l.length && l.length < 6) { while (l.length < 6) l = l.concat(pool.slice(0, 6 - l.length)); } this.labels = l.length ? l : ['—']; this.draw(); },   // ขึ้นทุกหมายเลขของผู้ถือการ์ด (สูงสุด 100 ช่อง)
     ensure(ticket) { if (!this.labels.includes(ticket)) this.labels[Math.floor(Math.random() * this.labels.length)] = ticket; this.draw(); },
     draw() {
       const c = this.canvas; if (!c) return; const S = 1000; c.width = S; c.height = S; const g = c.getContext('2d'), n = this.labels.length, R = S / 2, seg = Math.PI * 2 / n;
@@ -189,7 +189,7 @@
         g.beginPath(); g.moveTo(R, R); g.arc(R, R, R - 4, a0, a1); g.closePath();
         g.fillStyle = i % 2 ? '#1E1B17' : '#2B261F'; g.fill(); g.strokeStyle = 'rgba(201,160,99,.55)'; g.lineWidth = 2; g.stroke();
         g.save(); g.translate(R, R); g.rotate(a0 + seg / 2); g.textAlign = 'right'; g.textBaseline = 'middle';
-        g.fillStyle = i % 2 ? '#E6C78A' : '#F2EDE4'; g.font = `300 ${n > 14 ? 40 : 54}px Kanit, sans-serif`; g.fillText(this.labels[i], R - 46, 0); g.restore();
+        g.fillStyle = i % 2 ? '#E6C78A' : '#F2EDE4'; g.font = `${n > 40 ? 400 : 300} ${n <= 12 ? 54 : n <= 20 ? 42 : n <= 40 ? 30 : n <= 60 ? 24 : 20}px Kanit, sans-serif`; g.fillText(this.labels[i], R - 40, 0); g.restore();
       }
       g.beginPath(); g.arc(R, R, R - 4, 0, Math.PI * 2); g.strokeStyle = '#C9A063'; g.lineWidth = 6; g.stroke();
     },
@@ -241,7 +241,7 @@
         </div>
         <div class="wheelbox idle" id="wheelbox"><div class="pin"></div><canvas id="wheel"></canvas><div class="hub">KLIQ</div></div>
       </div>`;
-    Wheel.canvas = $('#wheel'); Wheel.rot = 0; Wheel.build(draw.pool_tickets || []);
+    Wheel.canvas = $('#wheel'); Wheel.rot = 0; fitWheel(); Wheel.build(draw.pool_tickets || []);
     go.textContent = draw.done ? 'ประกาศผลครบแล้ว' : `หมุนวงล้อ · ${prizeLabel(np)} · การ์ด ${card.name}`; go.disabled = draw.done;
     if (draw.pending) { openModal(draw.pending, justSpun); justSpun = false; }
   }
@@ -282,6 +282,9 @@
     upd(); timer = setInterval(upd, 1000);
     $('#yes').onclick = () => claim(true); $('#no').onclick = () => claim(false);
   }
+  // ย่อ/ขยายวงล้อให้พอดีกับพื้นที่ที่เหลือ ไม่ให้หน้าเลื่อน
+  function fitWheel() { const w = document.querySelector('.wheelwrap'), b = $('#wheelbox'); if (!w || !b) return; const s = Math.max(240, Math.min(w.clientHeight - 16, innerWidth * .36, innerHeight * .6)); b.style.width = b.style.height = s + 'px'; }
+  addEventListener('resize', fitWheel);
   function closeModal() { clearInterval(timer); $('#modal').hidden = true; $('#modal').innerHTML = ''; }
 
   async function claim(present) {
@@ -351,13 +354,14 @@
     }
   }
 
-  $('#go').onclick = () => { if (!releaseHold()) step(); };
+  $('#go').onclick = () => { $('#go').blur(); if (!releaseHold()) step(); };
   $('#fs').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
   document.addEventListener('keydown', e => {
     const modalOpen = !$('#modal').hidden;
     if (modalOpen) { if (e.key === 'Enter') { e.preventDefault(); claim(true); } if (e.key === 'n' || e.key === 'N') claim(false); return; }
-    if ((e.code === 'Space' || e.key === 'Enter') && e.target === document.body && releaseHold()) { e.preventDefault(); return; }
-    if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); step(); }
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+    if (e.code === 'Space' && !typing) { e.preventDefault(); if (e.repeat) return; if (!releaseHold()) step(); return; }   // Space ใช้ได้ทุกที่ ไม่เลื่อนหน้า
+    if (e.key === 'Enter' && !typing && releaseHold()) { e.preventDefault(); return; }
     if (e.key === 'f' || e.key === 'F') $('#fs').click();
     if (e.key === 'm' || e.key === 'M') $('#snd').click();
   });

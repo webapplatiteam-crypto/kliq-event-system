@@ -158,7 +158,7 @@ create table if not exists grand_draws (
 --     หมุนวงล้อสุ่มคนจากผู้ถือการ์ดใบนั้น (แต่ละรางวัลจึงคนละ SKU) ผู้ถูกเรียกต้องยืนยันว่าอยู่ในงาน ไม่อยู่ = สุ่มใหม่
 create table if not exists final_draws (
   id                  serial primary key,
-  series_order        text[] not null,          -- ลำดับเปิดการ์ด: ตำแหน่ง 1=OUT 2=IN(รางวัลที่ 3) 3=OUT 4=IN(รางวัลที่ 2) 5=IN(รางวัลที่ 1)
+  series_order        text[] not null,          -- ลำดับเปิดการ์ด: ตำแหน่ง 1=OUT 2=IN(รางวัลที่ 3) 3=IN(รางวัลที่ 2) 4=OUT 5=IN(รางวัลที่ 1)
   pool_count          int not null,             -- (ไม่ใช้แล้ว เก็บไว้เพื่อความเข้ากันได้)
   step                int not null default 0,   -- จำนวนการ์ดที่เปิดแล้ว (คัดออก + เปิดให้รางวัล) 0..5
   pending_participant uuid references participants(id),   -- คนที่วงล้อหยุด รอยืนยันว่าอยู่ในงาน
@@ -755,7 +755,7 @@ end $$;
 
 -- ---------------------------------------------------------------------
 -- รอบชิงรางวัลใหญ่ (Final)
--- เปิดการ์ดทีละใบ 5 ครั้ง (สุ่มว่าใบไหน): ใบที่ 1 OUT · ใบที่ 2 IN · ใบที่ 3 OUT · ใบที่ 4 IN · ใบที่ 5 IN
+-- เปิดการ์ดทีละใบ 5 ครั้ง (สุ่มว่าใบไหน): ใบที่ 1 OUT · ใบที่ 2 IN · ใบที่ 3 IN · ใบที่ 4 OUT · ใบที่ 5 IN
 -- การ์ด IN ใบแรก = รางวัลที่ 3, ใบที่สอง = รางวัลที่ 2, ใบสุดท้าย = รางวัลที่ 1
 -- แล้วหมุนวงล้อทีละรางวัล 3 → 2 → 1 (อันดับที่มีหลายชิ้น เช่น ที่ 3 สองชิ้น หมุนซ้ำจากการ์ดใบเดียวกัน)
 -- ผลทั้งหมดสุ่มและล็อกไว้ตั้งแต่กดเริ่ม กดซ้ำหรือรีเฟรชไม่เปลี่ยนผล
@@ -772,9 +772,9 @@ $$;
 
 -- ตำแหน่งการ์ดของรางวัลที่ r ใน series_order (IN ใบแรก=ที่ 3, ใบสอง=ที่ 2, ใบสุดท้าย=ที่ 1)
 create or replace function _final_pos(r int) returns int
-language sql immutable as $$ select case r when 3 then 2 when 2 then 4 when 1 then 5 end; $$;
+language sql immutable as $$ select case r when 3 then 2 when 2 then 3 when 1 then 5 end; $$;
 create or replace function _final_rank_at(pos int) returns int
-language sql immutable as $$ select case pos when 2 then 3 when 4 then 2 when 5 then 1 end; $$;
+language sql immutable as $$ select case pos when 2 then 3 when 3 then 2 when 5 then 1 end; $$;
 
 -- รางวัลชิ้นถัดไปที่ยังไม่มีผู้รับ (อันดับท้ายสุดก่อน ชิ้นที่สร้างก่อนก่อน)
 create or replace function _final_next_prize() returns prizes
@@ -810,9 +810,9 @@ begin
     'pool_tickets', case when g.step >= 5 and nxt is not null then (select coalesce(jsonb_agg(ticket_no order by random()), '[]'::jsonb) from _final_pool(g, nxt)) else '[]'::jsonb end,
     'series', (select jsonb_agg(jsonb_build_object(
         'code', se.code, 'name', se.name, 'color', se.color, 'tagline', se.tagline, 'pos', pos,
-        'out', pos in (1, 3) and g.step >= pos,
-        'in', pos in (2, 4, 5) and g.step >= pos,
-        'rank', case when pos in (2, 4, 5) and g.step >= pos then _final_rank_at(pos) end,
+        'out', pos in (1, 4) and g.step >= pos,
+        'in', pos in (2, 3, 5) and g.step >= pos,
+        'rank', case when pos in (2, 3, 5) and g.step >= pos then _final_rank_at(pos) end,
         'holders', (select count(*) from _eligible() e where e.series_code = se.code)) order by se.sort)
        from (select se.*, coalesce(array_position(g.series_order, se.code), 9) as pos from series se) se),
     'pending', case when pp.id is null then null else jsonb_build_object(
@@ -873,11 +873,11 @@ begin
     insert into audit_log (staff_id, action, detail) values (s.id, 'final_create', jsonb_build_object('draw', g.id, 'order', ord, 'locked', true));
     return final_state(p_token, g.id);
   end if;
-  -- สุ่มลำดับการ์ด โดยพยายามให้การ์ด IN (ตำแหน่ง 2, 4, 5) มีผู้มีสิทธิ์อย่างน้อย 1 คน
+  -- สุ่มลำดับการ์ด โดยพยายามให้การ์ด IN (ตำแหน่ง 2, 3, 5) มีผู้มีสิทธิ์อย่างน้อย 1 คน
   loop
     select array_agg(code order by random()) into ord from series;
     select bool_and((select count(*) from _eligible() e where e.series_code = ord[i]) >= 1) into okay
-      from unnest(array[2, 4, 5]) i;
+      from unnest(array[2, 3, 5]) i;
     tries := tries + 1;
     exit when okay or tries >= 50;
   end loop;
@@ -899,7 +899,7 @@ begin
   if g.step < 5 then
     update final_draws set step = step + 1 where id = g.id;
     insert into audit_log (staff_id, action, detail) values (s.id, 'final_open', jsonb_build_object('draw', g.id, 'pos', g.step + 1, 'card', g.series_order[g.step + 1],
-      'result', case when g.step + 1 in (1, 3) then 'out' else 'in' end));
+      'result', case when g.step + 1 in (1, 4) then 'out' else 'in' end));
     return final_state(p_token, g.id);
   end if;
   if g.pending_participant is not null then return jsonb_build_object('ok', false, 'code', 'PENDING'); end if;
