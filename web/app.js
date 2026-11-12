@@ -11,6 +11,7 @@
     BAD_PHONE: 'เบอร์โทรไม่ถูกต้อง กรุณากรอกเบอร์ 9–10 หลัก',
     NEED_CONSENT: 'กรุณายอมรับนโยบายความเป็นส่วนตัวก่อนลงทะเบียน',
     NEED_NAME: 'กรุณากรอกชื่อ - นามสกุล',
+    NEED_COMPANY: 'กรุณากรอกชื่อบริษัท / ร้านค้า',
     NOT_PREREGISTERED: 'ไม่พบเบอร์นี้ในรายชื่อลงทะเบียนล่วงหน้า กรุณาลงทะเบียนแบบ Walk-in',
     FULL: 'ขออภัย สิทธิ์ลุ้นรางวัลเต็มแล้ว ยังเดินชมงานและเล่นฐานได้ตามปกติ',
     CLOSED: 'ปิดรับลงทะเบียนลุ้นโชคแล้ว ติดตามประกาศผลบนเวที',
@@ -112,10 +113,12 @@
   }
 
   // ----- participant session
+  // จำผู้ร่วมงานในเครื่องนี้ 1 วัน (ต่ออายุทุกครั้งที่เปิด) · ถ้าหมดอายุหรือเปิดจากแอป/เบราว์เซอร์อื่น ให้กรอกเบอร์ยืนยันตัวตนใหม่ได้ที่หน้าฐาน
+  const P_TTL = 24 * 60 * 60 * 1000;
   const P = {
-    token() { return LS.get('kliq_pt'); },
-    set(t) { LS.set('kliq_pt', t); },
-    clear() { LS.del('kliq_pt'); }
+    token() { const t = LS.get('kliq_pt'); if (!t) return null; const at = +LS.get('kliq_pt_at') || 0; if (at && Date.now() - at > P_TTL) { P.clear(); return null; } LS.set('kliq_pt_at', String(Date.now())); return t; },
+    set(t) { LS.set('kliq_pt', t); LS.set('kliq_pt_at', String(Date.now())); },
+    clear() { LS.del('kliq_pt'); LS.del('kliq_pt_at'); }
   };
 
   // ----- staff session

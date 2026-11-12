@@ -108,16 +108,21 @@ async def main():
         await p2.goto(BASE + '/'); await p2.fill('#phone', '0899990000'); await p2.check('#consent'); await p2.click('#submit')
         await p2.wait_for_selector('#err button')
         await p2.click('#err button')
-        check('switches to walk-in form', await p2.is_visible('#name'))
-        await p2.fill('#name', 'วิชัย มีสุข'); await p2.fill('#company', 'ร้านไฟฟ้า')
+        check('switches to walk-in form', await p2.is_visible('#fname'))
+        await p2.fill('#fname', 'วิชัย'); await p2.click('#submit'); await p2.wait_for_timeout(300)
+        check('walk-in: surname required', 'นามสกุล' in await p2.inner_text('#err'))
+        await p2.fill('#lname', 'มีสุข'); await p2.click('#submit'); await p2.wait_for_timeout(300)
+        check('walk-in: company required, email optional', 'บริษัท' in await p2.inner_text('#err'))
+        await p2.fill('#company', 'ร้านไฟฟ้า')
         await shot(p2, '03_walkin_form', True)
         await p2.click('#submit'); await p2.wait_for_selector('#ticket')
+        check('walk-in name stored as "ชื่อ นามสกุล"', db("select name from participants where phone='0899990000'") == 'วิชัย มีสุข')
         t2 = await p2.inner_text('#ticket')
         check('walk-in got a card + ticket', '-00' in t2, t2)
 
         # bulk registrants so every series has people
         for i in range(25):
-            db(f"set role anon; select register_participant('0900000{i:03d}', true, 'ผู้ร่วมงาน ทดสอบ{i}', null, null, '{'UIFNC'[i % 5]}', true)")
+            db(f"set role anon; select register_participant('0900000{i:03d}', true, 'ผู้ร่วมงาน ทดสอบ{i}', null, 'บริษัททดสอบ', '{'UIFNC'[i % 5]}', true)")
 
         # ---------- stamps
         toks = db("select string_agg(qr_token, ' ' order by id) from stations").split()
@@ -129,8 +134,9 @@ async def main():
         await shot(p, '06_stamp_duplicate', False)
         await p.goto(BASE + '/s.html?t=BADTOKEN123456'); await p.wait_for_selector('.alert-big')
         check('bad QR alert', 'ไม่ถูกต้อง' in await p.inner_text('main'))
-        for t in toks[1:5]:
+        for t in toks[1:5]:   # สแกนฐานถัดไปได้ทันที ไม่ต้องรอ
             await p.goto(BASE + '/s.html?t=' + t); await p.wait_for_selector('.stamp-big')
+        check('no waiting between stations', await p.locator('.stamp-big').count() == 1)
         await p.goto(BASE + '/passport.html'); await p.wait_for_selector('.stations')
         check('passport shows 5/6', '5' in await p.inner_text('#jt + span') if await p.locator('#jt + span').count() else True)
         await shot(p, '04_passport_progress', True)
@@ -184,22 +190,23 @@ async def main():
         await shot(m, '12_final_ready', False)
         ready = lambda: m.wait_for_selector('#go:not([disabled])', timeout=40000)
         await m.click('#go'); await ready()
-        check('final: 5 cards in play', await m.locator('.scard').count() == 5 and await m.locator('.scard.out').count() == 0)
-        for i in range(2):
+        check('final: 5 cards face down', await m.locator('.scard').count() == 5 and await m.locator('.scard.out').count() == 0 and 'เปิดการ์ดใบที่ 1' in await m.inner_text('#go'))
+        for i in range(5):
             await m.keyboard.press('Space'); await m.wait_for_timeout(2500)
             if i == 0: await shot(m, '13a_final_roulette', False)
+            await m.wait_for_timeout(3000); await m.keyboard.press('Space')   # ข้ามช่วงค้าง 15 วิ
             await ready()
-        check('final: 3 cards left after 2 cuts', await m.locator('.scard:not(.out)').count() == 3)
-        await shot(m, '13_final_cards_3left', False)
-        check('final: ladder + wheel shown, rank 3 waiting for card', await m.locator('#wheel').count() == 1 and await m.locator('.lad').count() == 3 and 'เปิดการ์ดรางวัลที่ 3' in await m.inner_text('#go'))
-        await m.click('#go'); await m.wait_for_timeout(2500); await shot(m, '14_final_reveal_card', False); await ready()
-        check('final: rank 3 card picked from the 3', await m.locator('.scard.ranked').count() == 1 and await m.locator('.scard.pick').count() == 1 and 'หมุนวงล้อ' in await m.inner_text('#go'))
+            exp_out, exp_in = [1, 1, 2, 2, 2][i], [0, 1, 1, 2, 3][i]
+            check(f'final: card {i + 1} opened -> OUT {exp_out} / IN {exp_in}', await m.locator('.scard.out').count() == exp_out and await m.locator('.scard.in').count() == exp_in)
+            if i == 2: await shot(m, '13_final_cards_mid', False)
+        check('final: ladder (4 prizes) + wheel shown, rank 3 #1 next', await m.locator('#wheel').count() == 1 and await m.locator('.lad').count() == 4 and 'รางวัลที่ 3 (ชิ้นที่ 1/2)' in await m.inner_text('#go'))
+        card3 = await m.get_attribute('.scard.pick', 'data-code')
+        check('final: rank-3 card is the IN card opened 2nd', await m.locator(f'.scard.in[data-pos="2"][data-code="{card3}"]').count() == 1)
         await shot(m, '14a_final_wheel_ready', False)
-        # หมุนรางวัลที่ 3 → ไม่อยู่ → หมุนใหม่ → อยู่
+        # หมุนรางวัลที่ 3 ชิ้นที่ 1 → ไม่อยู่ → หมุนใหม่ → อยู่ → ชิ้นที่ 2 → อยู่
         await m.click('#go'); await m.wait_for_timeout(3500); await shot(m, '14b_final_wheel_spinning', False)
         await m.wait_for_selector('#yes', timeout=20000); await shot(m, '14c_final_winner_popup', False)
         first = await m.inner_text('.mbox .tk')
-        card3 = await m.get_attribute('.scard.pick', 'data-code')
         check('final: popup shows ticket from the rank-3 card + countdown', first.startswith(card3 + '-') and (await m.inner_text('#cd')).strip().isdigit())
         ctok = db(f"select token from participants where ticket_no = '{first}'")
         cctx, cp = await page_in(b)
@@ -208,20 +215,25 @@ async def main():
         check('called person sees stage call on phone', 'ขึ้นเวที' in await cp.inner_text('.win'))
         await shot(cp, '14d_passport_called', True)
         await m.keyboard.press('n'); await m.wait_for_timeout(2200); await ready()
-        check('final: no-show recorded, rank 3 still open', await m.locator('.noshow').count() == 1 and first in await m.inner_text('.noshow') and await m.locator('.lad.now[data-rank="3"]').count() == 1)
+        p3a = db("select id from prizes where kind='final' and rank=3 order by id limit 1")
+        check('final: no-show recorded, rank 3 #1 still open', await m.locator('.noshow').count() == 1 and first in await m.inner_text('.noshow') and await m.locator(f'.lad.now[data-prize="{p3a}"]').count() == 1)
         await m.click('#go'); await m.wait_for_selector('#yes', timeout=20000)
         second = await m.inner_text('.mbox .tk')
         check('final: re-spin picked a different person', second != first)
-        await m.keyboard.press('Enter'); await m.wait_for_timeout(3400); await ready()
-        check('final: rank 3 awarded on ladder', await m.locator('.lad.won[data-rank="3"]').count() == 1 and second in await m.inner_text('.lad.won[data-rank="3"]'))
+        await m.keyboard.press('Enter'); await m.wait_for_timeout(3800); await ready()
+        check('final: rank 3 #1 awarded, #2 next on same card', await m.locator(f'.lad.won[data-prize="{p3a}"]').count() == 1 and 'รางวัลที่ 3 (ชิ้นที่ 2/2)' in await m.inner_text('#go') and await m.get_attribute('.scard.pick', 'data-code') == card3)
+        await m.click('#go'); await m.wait_for_selector('#yes', timeout=20000)
+        third = await m.inner_text('.mbox .tk')
+        check('final: rank 3 #2 = third person from same card', third not in (first, second) and third.startswith(card3 + '-'))
+        await shot(m, '14e_final_rank3b_popup', False)
+        await m.keyboard.press('Enter'); await m.wait_for_timeout(3800); await ready()
         for rank in (2, 1):
-            await m.click('#go'); await ready()   # เปิดการ์ดของรางวัลนี้
-            check(f'final: rank {rank} card revealed, different card', await m.locator('.scard.ranked').count() == 4 - rank and await m.get_attribute('.scard.pick', 'data-code') != card3)
+            check(f'final: rank {rank} card = IN card opened at pos {({2: 4, 1: 5})[rank]}', await m.get_attribute('.scard.pick', 'data-pos') == str({2: 4, 1: 5}[rank]))
             await m.click('#go'); await m.wait_for_selector('#yes', timeout=20000)
             await shot(m, f'14e_final_rank{rank}_popup', False)
             if rank == 1: check('rank 1 popup shows prize image + description', await m.locator('.mbox .mi').count() == 1 and 'Deep Blue' in await m.inner_text('.mbox .pd'))
-            await m.click('#yes'); await m.wait_for_timeout(4800); await ready() if rank == 2 else m.wait_for_timeout(200)
-        check('final: 3 winners on 3 different cards, button finished', await m.locator('.lad.won').count() == 3 and await m.is_disabled('#go') and db("select count(distinct p.series_code) from draw_results r join participants p on p.id=r.participant_id join prizes z on z.id=r.prize_id where z.kind='final' and not r.voided") == '3')
+            await m.click('#yes'); await m.wait_for_timeout(5600); await ready() if rank == 2 else m.wait_for_timeout(200)
+        check('final: 4 winners on 3 different cards, button finished', await m.locator('.lad.won').count() == 4 and await m.is_disabled('#go') and db("select count(distinct p.series_code) from draw_results r join participants p on p.id=r.participant_id join prizes z on z.id=r.prize_id where z.kind='final' and not r.voided") == '3')
         await shot(m, '14f_final_done', False)
         await m.goto(BASE + '/stage/index.html'); await m.wait_for_selector('#list a')
         check('stage menu shows only the grand final', await m.locator('#list a').count() == 1 and 'ประกาศผลแล้ว' in await m.inner_text('#list'))
@@ -232,7 +244,7 @@ async def main():
         wctx, wp = await page_in(b)
         await wp.goto(BASE + '/'); await wp.evaluate(f"localStorage.setItem('kliq_pt', '{wtok}')")
         await wp.goto(BASE + '/passport.html'); await wp.wait_for_selector('.win')
-        check('winner sees banner on phone', 'iPhone' in await wp.inner_text('.win') and await wp.locator('.win img').count() == 1)
+        check('winner sees banner on phone', 'iPhone 18 Pro' in await wp.inner_text('.win') and await wp.locator('.win img').count() == 1)
         await shot(wp, '16_passport_winner', True)
 
         # ---------- admin pages

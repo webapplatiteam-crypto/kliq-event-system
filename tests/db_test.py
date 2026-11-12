@@ -89,6 +89,7 @@ check('bad phone', rpc('register_participant', 'abc', False, None, None, None, N
 check('needs consent', rpc('register_participant', '0800000001', False, None, None, None, None, False).get('code') == 'NEED_CONSENT')
 check('not preregistered', rpc('register_participant', '0899999999', False, None, None, None, None, True).get('code') == 'NOT_PREREGISTERED')
 check('walk-in needs name', rpc('register_participant', '0899999999', True, '', None, None, None, True).get('code') == 'NEED_NAME')
+check('walk-in needs company', rpc('register_participant', '0899999999', True, 'สมชาย ใจดี', None, '', None, True).get('code') == 'NEED_COMPANY')
 p1 = rpc('register_participant', '+66 80-000-0001', False, None, None, None, None, True)
 check('pre-registered by phone (+66 format), random card, ticket matches card', p1.get('ok') and p1['participant']['ticket_no'] == p1['participant']['series_code'] + '-001', p1)
 again = rpc('register_participant', '0800000001', False, None, None, None, None, True)
@@ -98,7 +99,7 @@ T1 = p1['token']
 
 # 399 more registrations in parallel (stress the lock)
 def reg(i):
-    return rpc('register_participant', f'09{i:08d}', True, f'Walk In {i}', None, None, ['U', 'I', 'F', 'N', 'C'][i % 5] if i % 7 else 'U', True)
+    return rpc('register_participant', f'09{i:08d}', True, f'Walk In {i}', None, 'บริษัททดสอบ', ['U', 'I', 'F', 'N', 'C'][i % 5] if i % 7 else 'U', True)
 
 
 with cf.ThreadPoolExecutor(max_workers=24) as ex:
@@ -113,7 +114,7 @@ per = sql("select json_object_agg(series_code, c) from (select series_code, coun
 check('no series over quota 80, all 5 cards used', all(v <= 80 for v in per.values()) and len(per) == 5, per)
 mism = sql("select count(*) from participants where left(ticket_no, 1) <> series_code", role=None)
 check('every ticket prefix matches its card', str(mism) == '0', mism)
-full = rpc('register_participant', '0811111111', True, 'Late', None, None, None, True)
+full = rpc('register_participant', '0811111111', True, 'Late', None, 'Co', None, True)
 check('401st gets FULL', full.get('code') == 'FULL', full)
 check('existing user still re-enters when full', rpc('register_participant', '0800000001', False, None, None, None, None, True).get('ok'))
 
@@ -188,76 +189,85 @@ check('register role can list', rpc('admin_participants', rpc('staff_login', 'RE
 ex = rpc('admin_export', A)
 check('export 400 rows', len(ex['rows']) == 400)
 
-# --- final draw v2 (cards 5 -> 1, then wheel per prize 3 -> 2 -> 1 with present / no-show confirmation)
+# --- final draw v3: open 5 cards OUT/IN/OUT/IN/IN (random which), IN cards = rank 3/2/1, wheel per prize (rank 3 has 2 prizes)
 pr = rpc('admin_prizes', MC)['rows']
-finals = {p['rank']: p for p in pr if p['kind'] == 'final'}
-check('3 final prizes seeded (rank 1..3)', sorted(finals) == [1, 2, 3], pr)
-check('duplicate final rank rejected', rpc('admin_prize_save', A, None, 'X', 'final', 1, 0, 2).get('code') == 'RANK_TAKEN')
+fin = [p for p in pr if p['kind'] == 'final']
+finals = {p['rank']: p for p in sorted(fin, key=lambda p: p['id'])}      # last prize per rank (rank 3 -> KEF)
+first3 = [p for p in fin if p['rank'] == 3][0]
+check('4 final prizes seeded (rank 1,2,3,3)', sorted(p['rank'] for p in fin) == [1, 2, 3, 3], pr)
+check('same rank twice allowed', rpc('admin_prize_save', A, None, 'X', 'final', 1, 0, 2).get('ok'))
+xid = [p for p in rpc('admin_prizes', MC)['rows'] if p['name'] == 'X'][0]['id']
+sql(f"delete from prizes where id = {xid}", role=None)
 check('normal prize added', rpc('admin_prize_save', A, None, 'ลำโพง', 'normal', 2, 5, None).get('ok'))
 IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
-check('prize image + description saved', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone', 'final', 1, 0, 1, '256GB สี Deep Blue', IMG).get('ok'))
-check('bad image rejected', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone', 'final', 1, 0, 1, None, 'http://x/y.png').get('code') == 'BAD_IMAGE')
+check('prize image + description saved', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro', 'final', 1, 0, 1, '256GB สี Deep Blue', IMG).get('ok'))
+check('bad image rejected', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro', 'final', 1, 0, 1, None, 'http://x/y.png').get('code') == 'BAD_IMAGE')
 z1 = [p for p in rpc('admin_prizes', MC)['rows'] if p['rank'] == 1][0]
 check('admin_prizes returns image/description', z1['image'] == IMG and z1['description'] == '256GB สี Deep Blue', z1)
-check('name-only save keeps image', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone', 'final', 1, 0, 1).get('ok') and [p for p in rpc('admin_prizes', MC)['rows'] if p['rank'] == 1][0]['image'] == IMG)
+check('name-only save keeps image', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro', 'final', 1, 0, 1).get('ok') and [p for p in rpc('admin_prizes', MC)['rows'] if p['rank'] == 1][0]['image'] == IMG)
 check('passport shows grand prize with image', rpc('get_passport', T1)['grand']['image'] == IMG)
-check('image removed with empty string', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone', 'final', 1, 0, 1, None, '').get('ok') and [p for p in rpc('admin_prizes', MC)['rows'] if p['rank'] == 1][0]['image'] is None)
-check('re-add image for stage test', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone', 'final', 1, 0, 1, None, IMG).get('ok'))
+check('image removed with empty string', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro', 'final', 1, 0, 1, None, '').get('ok') and [p for p in rpc('admin_prizes', MC)['rows'] if p['rank'] == 1][0]['image'] is None)
+check('re-add image for stage test', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro', 'final', 1, 0, 1, None, IMG).get('ok'))
 normal = [p for p in rpc('admin_prizes', MC)['rows'] if p['kind'] == 'normal'][0]['id']
 st0 = rpc('final_state', MC)
-check('no final draw yet', st0.get('ok') and st0['draw'] is None and len(st0['prizes']) == 3 and st0['claim_sec'] == 30, st0)
+check('no final draw yet', st0.get('ok') and st0['draw'] is None and len(st0['prizes']) == 4 and st0['claim_sec'] == 30, st0)
 check('final_state prizes carry image', [p for p in st0['prizes'] if p['rank'] == 1][0]['image'] == IMG)
-check('lock card order', rpc('admin_settings_save', A, {'final_order': ['U', 'N', 'I', 'F', 'C']}).get('ok') and rpc('admin_stats', A)['settings']['final_order'] == ['U', 'N', 'I', 'F', 'C'])
+# locked order = open order: pos1 OUT, pos2 IN(rank 3), pos3 OUT, pos4 IN(rank 2), pos5 IN(rank 1)
+check('lock card order', rpc('admin_settings_save', A, {'final_order': ['U', 'I', 'N', 'F', 'C']}).get('ok') and rpc('admin_stats', A)['settings']['final_order'] == ['U', 'I', 'N', 'F', 'C'])
 check('bad lock (4 items) ignored', rpc('admin_settings_save', A, {'final_order': ['U', 'N', 'I', 'F']}).get('ok') and rpc('admin_stats', A)['settings']['final_order'] is None)
-check('lock again', rpc('admin_settings_save', A, {'final_order': ['U', 'N', 'I', 'F', 'C']}).get('ok'))
+check('lock again', rpc('admin_settings_save', A, {'final_order': ['U', 'I', 'N', 'F', 'C']}).get('ok'))
 f = rpc('final_create', MC)['draw']
-check('final created: 5 cards all in play, 2 cuts to go', f['step'] == 0 and f['cuts'] == 2 and f['phase'] == 'cut' and len(f['series']) == 5 and not any(x['out'] or x['rank'] for x in f['series']), f)
+check('final created: 5 cards face down, phase cut', f['step'] == 0 and f['cuts'] == 5 and f['phase'] == 'cut' and len(f['series']) == 5 and not any(x['out'] or x['in'] or x['rank'] for x in f['series']) and f['next_rank'] == 3 and f['next_card'] is None, f)
+check('next prize = first rank-3 prize (1 of 2)', f['next_prize']['rank'] == 3 and f['next_prize']['seq'] == 1 and f['next_prize']['of'] == 2 and f['next_prize']['id'] == first3['id'], f['next_prize'])
 again = rpc('final_create', MC)['draw']
 check('create again returns same in-progress draw', again['id'] == f['id'])
 check('claim before spin rejected', rpc('final_claim', MC, f['id'], True).get('code') == 'NO_PENDING')
-for i in range(1, 3):
+expect = [('U', 'out', None), ('I', 'in', 3), ('N', 'out', None), ('F', 'in', 2), ('C', 'in', 1)]
+for i, (code, kind, rank) in enumerate(expect, 1):
     f = rpc('final_next', MC, f['id'])['draw']
-    check(f'card cut {i}: {5 - i} cards left', sum(1 for x in f['series'] if not x['out']) == 5 - i and f['step'] == i, f['series'])
-check('after cuts: phase reveal for rank 3, no card yet', f['phase'] == 'reveal' and f['next_rank'] == 3 and f['next_card'] is None and f['pool_tickets'] == [], f)
-f = rpc('final_next', MC, f['id'])['draw']
+    c = [x for x in f['series'] if x['code'] == code][0]
+    check(f'open card {i}: {code} is {kind.upper()}' + (f' rank {rank}' if rank else ''), f['step'] == i and c['out'] == (kind == 'out') and c['in'] == (kind == 'in') and c['rank'] == rank and c['pos'] == i, f['series'])
+    check(f'after card {i}: phase ' + ('cut' if i < 5 else 'spin'), f['phase'] == ('cut' if i < 5 else 'spin'))
+check('outs not adjacent: cards 1 and 3', [x['code'] for x in f['series'] if x['out']] == ['U', 'N'] and sorted(x['rank'] for x in f['series'] if x['in']) == [1, 2, 3])
 card3 = f['next_card']
-check('locked order honoured: UNO, NOVA cut; rank 3 = IKON', [x['code'] for x in f['series'] if x['out']] == ['U', 'N'] and card3 == 'I', f['series'])
-check('rank 3 card revealed (one of the 3 live cards)', f['phase'] == 'spin' and card3 and [x['code'] for x in f['series'] if x['rank'] == 3] == [card3] and not [x for x in f['series'] if x['code'] == card3][0]['out'], f)
-check('wheel pool = holders of that card', f['pool_left'] > 0 and all(t.startswith(card3 + '-') for t in f['pool_tickets']) and len(f['pool_tickets']) == f['pool_left'], f)
+check('rank 3 card = IKON, wheel pool = its holders', card3 == 'I' and f['pool_left'] > 0 and all(t.startswith('I-') for t in f['pool_tickets']) and len(f['pool_tickets']) == f['pool_left'], f)
 f = rpc('final_next', MC, f['id'])['draw']
-check('spin rank 3: pending person from card 3', f['pending'] and f['pending']['rank'] == 3 and f['pending']['card'] == card3 and f['pending']['ticket_no'].startswith(card3 + '-') and '**' in f['pending']['name'], f.get('pending'))
+check('spin rank 3: pending person from card 3, prize = Beyerdynamic', f['pending'] and f['pending']['rank'] == 3 and f['pending']['card'] == card3 and f['pending']['ticket_no'].startswith('I-') and '**' in f['pending']['name'] and f['pending']['prize_id'] == first3['id'], f.get('pending'))
 first = f['pending']['ticket_no']
 check('spin again while pending rejected', rpc('final_next', MC, f['id']).get('code') == 'PENDING')
 tok1 = sql(f"select token from participants where ticket_no = '{first}'", role=None)
 pp = rpc('get_passport', tok1)
-check('called person sees stage call on passport', pp.get('called') and pp['called']['rank'] == 3 and pp['called']['prize'] == 'หูฟังครอบหู', pp.get('called'))
+check('called person sees stage call on passport', pp.get('called') and pp['called']['rank'] == 3 and pp['called']['prize'] == first3['name'], pp.get('called'))
 f = rpc('final_claim', MC, f['id'], False)['draw']
-check('no-show: no pending, rank 3 still open on same card', f['pending'] is None and f['next_rank'] == 3 and f['next_card'] == card3 and f['phase'] == 'spin' and len(f['noshows']) == 1 and f['noshows'][0]['ticket_no'] == first, f)
+check('no-show: no pending, same prize still open on same card', f['pending'] is None and f['next_rank'] == 3 and f['next_prize']['id'] == first3['id'] and f['next_card'] == card3 and f['phase'] == 'spin' and len(f['noshows']) == 1 and f['noshows'][0]['ticket_no'] == first, f)
 check('no-show person no longer called', rpc('get_passport', tok1).get('called') is None)
 f = rpc('final_next', MC, f['id'])['draw']
-check('re-spin picks a different person, same card', f['pending'] and f['pending']['ticket_no'] != first and f['pending']['ticket_no'].startswith(card3 + '-'), f.get('pending'))
+check('re-spin picks a different person, same card', f['pending'] and f['pending']['ticket_no'] != first and f['pending']['ticket_no'].startswith('I-'), f.get('pending'))
 f = rpc('final_claim', MC, f['id'], True)['draw']
-check('rank 3 awarded, next rank 2 needs reveal', len(f['winners']) == 1 and f['winners'][0]['rank'] == 3 and f['winners'][0]['card'] == card3 and f['next_rank'] == 2 and f['phase'] == 'reveal' and not f['done'], f)
+w1 = f['winners'][0]['ticket_no']
+check('rank 3 #1 awarded, next = rank 3 #2 (KEF) on same card', len(f['winners']) == 1 and f['winners'][0]['rank'] == 3 and f['winners'][0]['prize_id'] == first3['id'] and f['next_rank'] == 3 and f['next_prize']['id'] == finals[3]['id'] and f['next_prize']['seq'] == 2 and f['next_card'] == card3 and f['phase'] == 'spin', f)
+f = rpc('final_next', MC, f['id'])['draw']
+check('second rank-3 spin: different person, same card', f['pending'] and f['pending']['ticket_no'] not in (first, w1) and f['pending']['ticket_no'].startswith('I-') and f['pending']['prize_id'] == finals[3]['id'], f.get('pending'))
+f = rpc('final_claim', MC, f['id'], True)['draw']
+check('both rank-3 prizes awarded, next rank 2', len(f['winners']) == 2 and f['next_rank'] == 2 and f['next_card'] == 'F', f)
 cards = {3: card3}
 for rank in (2, 1):
-    f = rpc('final_next', MC, f['id'])['draw']
     cards[rank] = f['next_card']
-    check(f'rank {rank} card revealed, different from earlier', f['phase'] == 'spin' and cards[rank] and cards[rank] not in [cards[k] for k in cards if k != rank] and all(t.startswith(cards[rank] + '-') for t in f['pool_tickets']), f)
-    check(f'locked order: rank {rank} card = ' + {2: 'FORMA', 1: 'CASA'}[rank], cards[rank] == {2: 'F', 1: 'C'}[rank])
+    check(f'locked order: rank {rank} card = ' + {2: 'FORMA', 1: 'CASA'}[rank], cards[rank] == {2: 'F', 1: 'C'}[rank] and all(t.startswith(cards[rank] + '-') for t in f['pool_tickets']), f)
     f = rpc('final_next', MC, f['id'])['draw']
     check(f'spin rank {rank}', f['pending'] and f['pending']['rank'] == rank and f['pending']['ticket_no'].startswith(cards[rank] + '-'), f.get('pending'))
     f = rpc('final_claim', MC, f['id'], True)['draw']
 check('clear lock', rpc('admin_settings_save', A, {'final_order': None}).get('ok') and rpc('admin_stats', A)['settings']['final_order'] is None)
-check('3 prizes on 3 different cards', len({w['card'] for w in f['winners']}) == 3 and sorted(x['rank'] for x in f['series'] if x['rank']) == [1, 2, 3] and sum(1 for x in f['series'] if x['out']) == 2, f)
-check('final done after rank 1 claimed', f['done'] and f['next_rank'] is None and sorted(w['rank'] for w in f['winners']) == [1, 2, 3], f)
-check('winners are distinct people', len({w['ticket_no'] for w in f['winners']}) == 3)
+check('4 prizes on 3 different cards', len({w['card'] for w in f['winners']}) == 3 and sorted(x['rank'] for x in f['series'] if x['rank']) == [1, 2, 3] and sum(1 for x in f['series'] if x['out']) == 2, f)
+check('final done after rank 1 claimed', f['done'] and f['next_rank'] is None and sorted(w['rank'] for w in f['winners']) == [1, 2, 3, 3], f)
+check('winners are distinct people', len({w['ticket_no'] for w in f['winners']}) == 4)
 check('extra next does nothing', rpc('final_next', MC, f['id'])['draw']['done'])
 check('cannot run a second final', rpc('final_create', MC).get('code') == 'FINAL_DONE')
 res = rpc('draw_results_list', A)['rows']
-check('3 live final results with ranks 1,2,3', sorted(x['rank'] for x in res if x['kind'] == 'final' and not x['voided']) == [1, 2, 3], res)
+check('4 live final results with ranks 1,2,3,3', sorted(x['rank'] for x in res if x['kind'] == 'final' and not x['voided']) == [1, 2, 3, 3], res)
 check('no-show recorded as voided result', any(x['kind'] == 'final' and x['voided'] and x['ticket_no'] == first for x in res), res)
 r1 = [x for x in res if x['rank'] == 1 and not x['voided']][0]
-check('rank 1 prize is iPhone', r1['prize'] == 'iPhone')
+check('rank 1 prize is iPhone 18 Pro', r1['prize'] == 'iPhone 18 Pro')
 check('replace blocked while winner valid', rpc('final_replace', MC, 1).get('code') == 'PRIZE_DONE')
 check('void rank 1', rpc('draw_void', A, r1['id']).get('ok'))
 f = rpc('final_state', MC)['draw']
@@ -271,17 +281,17 @@ for i in range(2):
 check('normal prize quantity enforced', rpc('draw_prize_next', MC, normal).get('code') == 'PRIZE_DONE')
 res = rpc('draw_results_list', A)['rows']
 live = [x for x in res if not x['voided']]
-check('5 live winners, all different people', len(live) == 5 and len({x['ticket_no'] for x in live}) == 5, live)
+check('6 live winners, all different people', len(live) == 6 and len({x['ticket_no'] for x in live}) == 6, live)
 check('final re-closed after replacement', rpc('final_state', MC)['draw']['next_rank'] is None)
 wt = sql(f"select token from participants where ticket_no = '{rp['ticket_no']}'", role=None)
 wp = rpc('get_passport', wt)
-check('replacement winner sees iPhone on passport', wp.get('won') and wp['won']['prize'] == 'iPhone', wp.get('won'))
+check('replacement winner sees iPhone on passport', wp.get('won') and wp['won']['prize'] == 'iPhone 18 Pro', wp.get('won'))
 # cutoff blocks registration and late registrants not eligible
 rpc('admin_settings_save', A, {'cutoff_at': '2000-01-01T00:00:00Z'})
-check('registration closed after cutoff', rpc('register_participant', '0822222222', True, 'X', None, None, None, True).get('code') == 'CLOSED')
+check('registration closed after cutoff', rpc('register_participant', '0822222222', True, 'X', None, 'Co', None, True).get('code') == 'CLOSED')
 check('nobody eligible when cutoff before all registrations', rpc('draw_eligible_count', MC)['eligible'] == 0)
 rpc('admin_settings_save', A, {'cutoff_at': ''})
-check('cutoff cleared', rpc('draw_eligible_count', MC)['eligible'] == 400 - 7)
+check('cutoff cleared', rpc('draw_eligible_count', MC)['eligible'] == 400 - 8)   # 4 final + 2 normal + no-show + voided
 check('logout', rpc('staff_logout', SV).get('ok') and rpc('staff_me', SV).get('code') == 'AUTH')
 
 print('\nRESULT:', 'ALL PASS' if not fails else f'{len(fails)} FAILED: {fails}')

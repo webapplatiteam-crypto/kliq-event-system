@@ -43,9 +43,12 @@
     </div>
 
     <div id="walkFields" hidden style="display:flex;flex-direction:column;gap:14px">
-      <div class="field"><label for="name">ชื่อ - นามสกุล *</label><input class="input" id="name" autocomplete="name" placeholder="ชื่อ นามสกุล"></div>
-      <div class="field"><label for="email">อีเมล</label><input class="input" id="email" type="email" autocomplete="email" placeholder="name@email.com"></div>
-      <div class="field"><label for="company">บริษัท / ร้านค้า</label><input class="input" id="company" autocomplete="organization" placeholder="ชื่อบริษัทหรือร้านค้า"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label for="fname">ชื่อ *</label><input class="input" id="fname" autocomplete="given-name" placeholder="ชื่อ"></div>
+        <div class="field"><label for="lname">นามสกุล *</label><input class="input" id="lname" autocomplete="family-name" placeholder="นามสกุล"></div>
+      </div>
+      <div class="field"><label for="company">บริษัท / ร้านค้า *</label><input class="input" id="company" autocomplete="organization" placeholder="ชื่อบริษัทหรือร้านค้า"></div>
+      <div class="field"><label for="email">อีเมล <span class="muted">(ไม่บังคับ)</span></label><input class="input" id="email" type="email" autocomplete="email" placeholder="name@email.com"></div>
       <div class="notice small" style="color:var(--ink2)">ระบบจะสุ่มการ์ด KLIQ ให้คุณ 1 ใบ จาก 5 ซีรีส์ หลังกดรับสิทธิ์</div>
     </div>
 
@@ -93,10 +96,15 @@
     e.preventDefault();
     const btn = $('#submit');
     $('#err').hidden = true;
+    const fname = $('#fname').value.trim(), lname = $('#lname').value.trim(), company = $('#company').value.trim();
+    if (walkin) {   // walk-in: ชื่อ นามสกุล เบอร์ บริษัท บังคับ · อีเมลไม่บังคับ
+      const missing = !fname ? ['ชื่อ', '#fname'] : !lname ? ['นามสกุล', '#lname'] : !$('#phone').value.trim() ? ['เบอร์โทรศัพท์', '#phone'] : !company ? ['บริษัท / ร้านค้า', '#company'] : null;
+      if (missing) { $('#err').hidden = false; $('#err').textContent = 'กรุณากรอก' + missing[0]; $(missing[1]).focus(); return; }
+    }
     busy(btn, true, 'กำลังลงทะเบียน…');
     const r = await rpc('register_participant', {
-      p_phone: $('#phone').value, p_walkin: walkin, p_name: $('#name').value, p_email: $('#email').value,
-      p_company: $('#company').value, p_consent: $('#consent').checked
+      p_phone: $('#phone').value, p_walkin: walkin, p_name: (fname + ' ' + lname).trim(), p_email: $('#email').value,
+      p_company: company, p_consent: $('#consent').checked
     });
     busy(btn, false);
     if (r && r.ok) { P.set(r.token); location.href = next || '/passport.html?welcome=1'; return; }
@@ -105,7 +113,7 @@
     if (r && r.code === 'NOT_PREREGISTERED') {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'btn ghost sm'; b.style.marginTop = '10px'; b.textContent = 'ลงทะเบียนแบบ Walk-in';
-      b.onclick = () => { setMode(true); $('#name').focus(); };
+      b.onclick = () => { setMode(true); $('#fname').focus(); };
       $('#err').appendChild(document.createElement('br')); $('#err').appendChild(b);
     }
   });

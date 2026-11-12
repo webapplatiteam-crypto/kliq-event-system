@@ -22,6 +22,9 @@
   .scard.win { border-color:var(--gold); transform:scale(1.05); box-shadow:0 0 90px rgba(201,160,99,.6) }
   .scard.pick { border-color:var(--gold); box-shadow:0 0 60px rgba(201,160,99,.55) }
   .scard.ranked:not(.pick) { opacity:.55 }
+  .scard.in { border-color:var(--gold) }
+  .stamp.still { animation:none; opacity:1; transform:translate(-50%,-50%) rotate(-12deg) scale(1) }
+  .cards5.mini .stamp.still { top:50% }
   .scard .rkb { position:absolute; top:10px; left:10px; z-index:2; background:var(--gold); color:#121212; font-size:clamp(11px,.9vw,16px); font-weight:500; padding:4px 10px; border-radius:12px; letter-spacing:1px }
   .cards5.mini { flex:0 0 auto; gap:1vw } .cards5.mini .scard { padding-bottom:1.2vh; gap:.4vh; border-radius:16px } .cards5.mini .scard img { height:12vh }
   .cards5.mini .scard .nm { font-size:clamp(14px,1.4vw,24px); letter-spacing:4px } .cards5.mini .scard .tg { font-size:clamp(10px,.8vw,13px); letter-spacing:1px }
@@ -77,15 +80,13 @@
   .whiteout { position:fixed; inset:0; background:#fff; pointer-events:none; z-index:49; animation:whiteout .7s ease-out forwards }
   @keyframes whiteout { 0% { opacity:.95 } 100% { opacity:0 } }
   .snd { position:fixed; right:18px; bottom:18px; width:44px; height:44px; border-radius:22px; border:1px solid var(--goldline); background:rgba(0,0,0,.5); color:var(--gold); font-size:18px; cursor:pointer; z-index:60 }
-  .badge { display:inline-flex; align-items:center; gap:12px; border-radius:16px; overflow:hidden; padding-right:18px }
-  .badge img { width:72px; height:48px; object-fit:cover }
   @media (max-width: 900px) { .wheelwrap { grid-template-columns:1fr } .wheelbox { width:min(80vw,50vh); height:min(80vw,50vh) } }
 </style>
 </head>
 <body class="stage">
 <div class="stagewrap">
   <div class="head">
-    <div><div class="eyebrow" style="letter-spacing:6px">KLIQ LAUNCH · GRAND FINAL</div><h1>ลุ้นรางวัลใหญ่ <span style="color:var(--gold)" id="top">iPhone</span></h1></div>
+    <div><div class="eyebrow" style="letter-spacing:6px">KLIQ LAUNCH · GRAND FINAL</div><h1>ลุ้นรางวัลใหญ่ <span style="color:var(--gold)" id="top">iPhone 18 Pro</span></h1></div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px"><div class="track" id="track" aria-hidden="true"></div>
       <a href="/stage/index.html" class="muted small">‹ กลับเมนู</a></div>
   </div>
@@ -108,22 +109,41 @@
   if (!me) return;
   let draw = null, prizes = [], claimSec = 60, working = false, timer = null, justSpun = false;   // justSpun: ป๊อปอัปเปิดต่อจากวงล้อในเครื่องนี้ → เริ่มนับ 30 วิเต็มตอนป๊อปอัปขึ้น
   const sleep = ms => new Promise(r => setTimeout(r, ms));
-  const prizeOf = r => prizes.find(p => p.rank === r) || {};
-  const prizeName = r => prizeOf(r).name || ('รางวัลที่ ' + r);
-  const prizeImg = (r, cls) => prizeOf(r).image ? `<img class="${cls}" src="${prizeOf(r).image}" alt="">` : '';
+  const prizeById = id => prizes.find(p => p.id === id) || {};
+  const prizesOf = r => prizes.filter(p => p.rank === r);
+  const prizeOf = r => prizesOf(r)[0] || {};
+  const prizeName = r => prizesOf(r).map(p => p.name).join(' + ') || ('รางวัลที่ ' + r);
+  const prizeLabel = z => !z ? '' : `รางวัลที่ ${z.rank}` + (z.of > 1 ? ` (ชิ้นที่ ${z.seq}/${z.of})` : '');
+  const imgTag = (src, cls) => src ? `<img class="${cls}" src="${src}" alt="">` : '';
+  const OPEN_KIND = [null, 'out', 'in', 'out', 'in', 'in'];        // ผลของการเปิดใบที่ 1..5 (ล็อกตามกติกา · สุ่มว่าใบไหน)
 
   // ---------- เสียง (สร้างด้วย WebAudio ไม่ต้องมีไฟล์) ----------
-  const SND = { on: K.LS.get('kliq_snd') !== '0', ctx: null };
+  const SND = { on: K.LS.get('kliq_snd') !== '0', ctx: null, noise: null };
   $('#snd').textContent = SND.on ? '🔊' : '🔇';
   function actx() { if (!SND.on) return null; try { SND.ctx = SND.ctx || new (window.AudioContext || window.webkitAudioContext)(); if (SND.ctx.state === 'suspended') SND.ctx.resume(); return SND.ctx; } catch (e) { return null; } }
-  function tone(freq, dur, type, gain, when) { const c = actx(); if (!c) return; const o = c.createOscillator(), g = c.createGain(); o.type = type || 'sine'; o.frequency.value = freq;
-    const t = c.currentTime + (when || 0); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain || .25, t + .01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + .05); }
+  function tone(freq, dur, type, gain, when, opts) { const c = actx(); if (!c) return; opts = opts || {}; const o = c.createOscillator(), g = c.createGain(); o.type = type || 'sine';
+    const t = c.currentTime + (when || 0); o.frequency.setValueAtTime(freq, t); if (opts.to) o.frequency.exponentialRampToValueAtTime(opts.to, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain || .25, t + (opts.attack || .01)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    let node = o; if (opts.lp) { const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(opts.lp, t); if (opts.lpTo) f.frequency.exponentialRampToValueAtTime(opts.lpTo, t + dur); o.connect(f); node = f; }
+    node.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + .05); }
+  function noise(dur, gain, when, opts) {                     // เสียงซ่า/กระทบ (ฉาบ · ระเบิด · ลมพัด)
+    const c = actx(); if (!c) return; opts = opts || {}; const t = c.currentTime + (when || 0);
+    if (!SND.noise) { const b = c.createBuffer(1, c.sampleRate * 2, c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; SND.noise = b; }
+    const src = c.createBufferSource(); src.buffer = SND.noise; src.loop = true; const f = c.createBiquadFilter(); f.type = opts.type || 'bandpass'; f.frequency.setValueAtTime(opts.f || 3000, t); if (opts.fTo) f.frequency.exponentialRampToValueAtTime(opts.fTo, t + dur); f.Q.value = opts.q || .7;
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain || .2, t + (opts.attack || .01)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g).connect(c.destination); src.start(t); src.stop(t + dur + .05); }
+  const chord = (freqs, dur, gain, when, type) => freqs.forEach(f => { tone(f, dur, type || 'sawtooth', gain, when, { lp: 2600, attack: .04 }); tone(f * 1.004, dur, type || 'sawtooth', gain * .7, when, { lp: 2200, attack: .04 }); tone(f / 2, dur, 'triangle', gain * .8, when, { attack: .03 }); });
   const tick = () => tone(1400, .05, 'square', .06);
   const thud = () => { tone(110, .35, 'sine', .5); tone(55, .5, 'triangle', .4); };
+  const boom = () => { tone(90, 1.1, 'sine', .9, 0, { to: 30 }); tone(45, 1.4, 'triangle', .6, 0, { to: 25 }); noise(.9, .5, 0, { type: 'lowpass', f: 900, fTo: 80 }); noise(.35, .25, 0, { f: 4000, fTo: 600 }); };   // OUT: ระเบิดต่ำ + กระแทก
   const ding = () => { tone(880, .5, 'sine', .3); tone(1320, .7, 'sine', .18, .05); };
-  const fanfare = () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .9 - i * .08, 'triangle', .22, i * .13));
-  const drumroll = (ms) => { const c = actx(); if (!c) return; const n = Math.floor(ms / 45); for (let i = 0; i < n; i++) tone(140 + Math.random() * 40, .06, 'triangle', .12 + (i / n) * .12, i * .045); };
+  const shimmer = (when) => [1568, 1976, 2349, 2637, 3136, 3520].forEach((f, i) => tone(f, .9, 'sine', .09, (when || 0) + i * .05));
+  const cheer = () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, .55, 'triangle', .3, i * .09)); chord([523, 659, 784], 1.6, .12, .35); shimmer(.4); noise(1.2, .18, .3, { f: 7000, fTo: 2000, attack: .02 }); };   // IN: เข้ารอบ
+  const fanfare = () => { chord([523, 659, 784], .6, .16, 0); chord([587, 740, 880], .6, .16, .5); chord([659, 784, 988], .7, .17, 1.0); chord([784, 988, 1175, 1568], 2.6, .2, 1.6); shimmer(1.7); shimmer(2.2); noise(2.2, .22, 1.6, { f: 6000, fTo: 1500, attack: .02 }); tone(98, 2.6, 'sine', .5, 1.6); };   // รางวัลใหญ่
+  const sting = () => { chord([659, 784, 988], .5, .15, 0); chord([784, 988, 1175], 1.6, .18, .4); shimmer(.45); noise(1.2, .16, .4, { f: 6000, fTo: 1800 }); tone(131, 1.6, 'sine', .4, .4); };   // รางวัลที่ 2–3
+  const drumroll = (ms) => { const c = actx(); if (!c) return; const n = Math.floor(ms / 42); for (let i = 0; i < n; i++) { tone(120 + Math.random() * 50, .07, 'triangle', .14 + (i / n) * .2, i * .042); noise(.04, .05 + (i / n) * .12, i * .042, { f: 2500, q: 1.5 }); } };
+  const riser = (ms) => { const s = ms / 1000; tone(80, s, 'sawtooth', .07, 0, { to: 900, lp: 400, lpTo: 4000, attack: s * .6 }); noise(s, .22, 0, { f: 300, fTo: 6000, attack: s * .7 }); };   // เสียงไต่ขึ้นเร่งลุ้น
+  const gong = () => { [196, 262, 330, 392].forEach((f, i) => tone(f, 3.5, 'sine', .18 - i * .02, 0, { attack: .02 })); tone(98, 3.5, 'triangle', .22, 0); noise(.6, .12, 0, { f: 2000, fTo: 300 }); };   // ค้างรอผล
   const beep = () => tone(990, .12, 'sine', .2);
   $('#snd').onclick = () => { SND.on = !SND.on; K.LS.set('kliq_snd', SND.on ? '1' : '0'); $('#snd').textContent = SND.on ? '🔊' : '🔇'; if (SND.on) tick(); };
 
@@ -153,7 +173,8 @@
   const HOLD_MS = 15000; let holdResolve = null;
   function hold(ms) { return new Promise(res => { holdResolve = res; const t = setTimeout(() => { holdResolve = null; res(); }, ms); holdResolve._t = t; }); }
   function releaseHold() { if (holdResolve) { clearTimeout(holdResolve._t); const r = holdResolve; holdResolve = null; r(); return true; } return false; }
-  async function eliminate(el, text) { el.classList.remove('spot'); el.classList.add('flash'); await sleep(120); el.classList.add('shake'); thud(); stamp(el, text || 'OUT'); await sleep(700); el.classList.remove('shake'); el.classList.add('out'); await sleep(900); }
+  async function eliminate(el) { el.classList.remove('spot'); el.classList.add('flash'); await sleep(120); el.classList.add('shake'); boom(); stamp(el, 'OUT'); await sleep(700); el.classList.remove('shake'); el.classList.add('out'); await sleep(900); }
+  async function admit(el, text) { el.classList.remove('spot'); el.classList.add('flash', 'win'); cheer(); stamp(el, text || 'IN', true); confetti(140); await sleep(1500); el.classList.remove('win'); el.classList.add('in'); }
 
   // ---------- วงล้อ ----------
   const Wheel = {
@@ -178,7 +199,7 @@
       const start = ((this.rot % 360) + 360) % 360;
       const landing = (360 - (idx * seg + seg / 2)) + (Math.random() - .5) * seg * .6;   // มุมที่ทำให้ช่อง idx อยู่ใต้เข็มด้านบน
       const target = 360 * (6 + Math.floor(Math.random() * 2)) + ((landing - start + 360) % 360);
-      const dur = 7000, t0 = performance.now(); let lastSeg = -1;
+      const dur = 7000, t0 = performance.now(); let lastSeg = -1; riser(dur * .9);
       return new Promise(res => { const f = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3.2); this.rot = start + target * e;
         this.canvas.style.transform = `rotate(${this.rot}deg)`; const cur = Math.floor((((360 - this.rot % 360) % 360) + 360) % 360 / seg); if (cur !== lastSeg) { lastSeg = cur; tick(); }
         if (k < 1) requestAnimationFrame(f); else setTimeout(res, 400); }; requestAnimationFrame(f); });
@@ -188,48 +209,50 @@
   // ---------- เรนเดอร์ ----------
   function render() {
     const go = $('#go');
-    const p1 = prizes.find(p => p.rank === 1); if (p1) $('#top').textContent = p1.name;
+    const p1 = prizeOf(1); if (p1.name) $('#top').textContent = p1.name;
     if (!draw) {
-      $('#track').innerHTML = ''; setHead('ทุกคนถือการ์ด KLIQ 1 ใบ · คัดการ์ดออกจนเหลือ 3 ใบ แล้วเปิดการ์ดทีละใบให้รางวัลที่ 3 · 2 · 1');
+      $('#track').innerHTML = ''; setHead('ทุกคนถือการ์ด KLIQ 1 ใบ · เปิดการ์ดทีละใบ 5 ครั้ง (OUT · IN · OUT · IN · IN) · การ์ดที่เข้ารอบ 3 ใบ = รางวัลที่ 3 · 2 · 1');
       $('#stagebody').innerHTML = cardsHTML(K._series || [], false); go.textContent = 'เริ่มรอบชิง'; go.disabled = false; return;
     }
-    const ranks = draw.ranks || [], r = draw.next_rank, ph = draw.phase, live = draw.series.filter(s => !s.out).length;
-    const labels = ['คัดการ์ด 5 → ' + (5 - draw.cuts)].concat(ranks.map(k => 'รางวัลที่ ' + k));
-    const cur = ph === 'cut' ? 0 : r ? 1 + ranks.indexOf(r) : labels.length;
+    const ph = draw.phase, np = draw.next_prize, r = draw.next_rank;
+    const finals = prizes.slice().sort((a, b) => a.rank - b.rank || a.id - b.id);
+    const order = finals.slice().sort((a, b) => b.rank - a.rank || a.id - b.id);     // ลำดับที่จะหมุน: ที่ 3 #1 → ที่ 3 #2 → ที่ 2 → ที่ 1
+    const labels = ['เปิดการ์ด 5 ใบ'].concat(order.map(z => 'รางวัลที่ ' + z.rank + (prizesOf(z.rank).length > 1 ? ' #' + (prizesOf(z.rank).indexOf(z) + 1) : '')));
+    const cur = ph === 'cut' ? 0 : np ? 1 + order.findIndex(z => z.id === np.id) : labels.length;
     $('#track').innerHTML = labels.map((l, i) => `<span class="${i === cur && !draw.done ? 'on' : i < cur || draw.done ? 'past' : ''}">${l}</span>`).join('');
 
     if (ph === 'cut') {
-      setHead(draw.step === 0 ? `คัดการ์ดออกทีละใบ จนเหลือ ${5 - draw.cuts} ใบ` : `เหลือการ์ด ${live} ใบ · คัดออกอีก ${draw.cuts - draw.step} ใบ`);
+      const k = draw.step + 1;
+      setHead(draw.step === 0 ? 'เปิดการ์ดทีละใบ · ใบที่ 1 OUT · ใบที่ 2 IN · ใบที่ 3 OUT · ใบที่ 4 IN · ใบที่ 5 IN' : `เปิดแล้ว ${draw.step} ใบ · เข้ารอบ ${draw.series.filter(s => s.in).length} · ตกรอบ ${draw.series.filter(s => s.out).length} · เหลืออีก ${5 - draw.step} ใบ`);
       $('#stagebody').innerHTML = cardsHTML(draw.series, false);
-      go.textContent = 'คัดการ์ดออก 1 ใบ'; go.disabled = false; return;
+      go.textContent = `เปิดการ์ดใบที่ ${k}`; go.disabled = false; return;
     }
     // รอบรางวัล: การ์ดแถวบน + บันไดรางวัล + วงล้อ
     const card = (draw.next_card && draw.series.find(s => s.code === draw.next_card)) || { name: '' };
-    setHead(draw.done ? 'ขอแสดงความยินดีกับผู้โชคดีทุกท่าน!'
-      : ph === 'reveal' ? `รางวัลที่ ${r} · ${prizeName(r)} · เปิดการ์ด 1 ใน ${live - ranks.filter(k => k > r).length} ใบที่เหลือ`
-      : `รางวัลที่ ${r} · ${prizeName(r)} · ผู้ถือการ์ด ${card.name} ${draw.pool_left} ท่านลุ้น`);
-    const won = Object.fromEntries((draw.winners || []).map(w => [w.rank, w]));
+    setHead(draw.done ? 'ขอแสดงความยินดีกับผู้โชคดีทุกท่าน!' : `${prizeLabel(np)} · ${np ? np.name : ''} · ผู้ถือการ์ด ${card.name} ${draw.pool_left} ท่านลุ้น`);
+    const won = Object.fromEntries((draw.winners || []).map(w => [w.prize_id, w]));
     const cardName = k => { const c = draw.series.find(s => s.rank === k); return c ? c.name : ''; };
     $('#stagebody').innerHTML = cardsHTML(draw.series, true) + `
       <div class="wheelwrap">
-        <div class="ladder" id="ladder">${ranks.slice().sort((a, b) => a - b).map(k => { const w = won[k]; return `<div class="lad ${w ? 'won' : k === r ? 'now' : ''} ${w && k === 1 ? 'first' : ''}" data-rank="${k}">
-            <div class="r">${k}</div>${prizeImg(k, 'li')}<div style="flex:1;display:flex;flex-direction:column;gap:2px"><div class="pz">รางวัลที่ ${k} · ${esc(prizeName(k))}</div>${prizeOf(k).description ? `<div class="st">${esc(prizeOf(k).description)}</div>` : ''}
-            ${w ? `<div class="wn">${esc(w.ticket_no)}</div><div class="st">${esc(w.name)} · การ์ด ${esc(cardName(k))} · รับรางวัลแล้ว</div>` : `<div class="st">${k === r ? (ph === 'reveal' ? 'รอเปิดการ์ด' : 'การ์ด ' + esc(card.name) + ' · กำลังจะหมุน') : 'รอ'}</div>`}</div></div>`; }).join('')}
+        <div class="ladder" id="ladder">${finals.map(z => { const w = won[z.id], now = np && np.id === z.id, many = prizesOf(z.rank).length > 1, seq = prizesOf(z.rank).indexOf(z) + 1; return `<div class="lad ${w ? 'won' : now ? 'now' : ''} ${w && z.rank === 1 ? 'first' : ''}" data-prize="${z.id}">
+            <div class="r">${z.rank}</div>${imgTag(z.image, 'li')}<div style="flex:1;display:flex;flex-direction:column;gap:2px"><div class="pz">รางวัลที่ ${z.rank}${many ? ` (ชิ้นที่ ${seq}/${prizesOf(z.rank).length})` : ''} · ${esc(z.name)}</div>${z.description ? `<div class="st">${esc(z.description)}</div>` : ''}
+            ${w ? `<div class="wn">${esc(w.ticket_no)}</div><div class="st">${esc(w.name)} · การ์ด ${esc(cardName(z.rank))} · รับรางวัลแล้ว</div>` : `<div class="st">${now ? 'การ์ด ' + esc(card.name) + ' · กำลังจะหมุน' : 'การ์ด ' + esc(cardName(z.rank)) + ' · รอ'}</div>`}</div></div>`; }).join('')}
           ${(draw.noshows || []).length ? `<div class="noshow">ไม่อยู่ในงาน (ตัดสิทธิ์): ${draw.noshows.map(x => esc(x.ticket_no)).join(' · ')}</div>` : ''}
         </div>
         <div class="wheelbox idle" id="wheelbox"><div class="pin"></div><canvas id="wheel"></canvas><div class="hub">KLIQ</div></div>
       </div>`;
     Wheel.canvas = $('#wheel'); Wheel.rot = 0; Wheel.build(draw.pool_tickets || []);
-    go.textContent = draw.done ? 'ประกาศผลครบแล้ว' : ph === 'reveal' ? `เปิดการ์ดรางวัลที่ ${r}` : `หมุนวงล้อ · รางวัลที่ ${r} · การ์ด ${card.name}`; go.disabled = draw.done;
+    go.textContent = draw.done ? 'ประกาศผลครบแล้ว' : `หมุนวงล้อ · ${prizeLabel(np)} · การ์ด ${card.name}`; go.disabled = draw.done;
     if (draw.pending) { openModal(draw.pending, justSpun); justSpun = false; }
   }
 
   function cardsHTML(series, mini) {
-    const cur = draw && draw.next_card;
-    return `<div class="cards5 ${mini ? 'mini' : ''}">${series.map(s => `<div class="scard ${s.out ? 'out' : ''} ${s.rank ? 'ranked' : ''} ${s.code === cur && !draw.done ? 'pick' : ''}" data-code="${esc(s.code)}" style="background:${esc(s.color)};color:${inkFor(s.code)}">
-      ${s.rank ? `<div class="rkb">รางวัลที่ ${s.rank}</div>` : ''}
+    const cur = draw && draw.next_card, spin = draw && draw.phase !== 'cut';
+    return `<div class="cards5 ${mini ? 'mini' : ''}">${series.map(s => `<div class="scard ${s.out ? 'out' : ''} ${s.in ? 'in' : ''} ${s.rank && spin ? 'ranked' : ''} ${s.code === cur && !draw.done ? 'pick' : ''}" data-code="${esc(s.code)}" data-pos="${s.pos || ''}" style="background:${esc(s.color)};color:${inkFor(s.code)}">
+      ${s.rank && spin ? `<div class="rkb">รางวัลที่ ${s.rank}</div>` : s.in ? `<div class="rkb">IN · เข้ารอบ</div>` : ''}
+      ${s.out ? '<div class="stamp still">OUT</div>' : s.in && !spin ? '<div class="stamp gold still">IN</div>' : ''}
       <img src="${seriesImg(s.code, 'p')}" alt="สวิตช์ KLIQ ${esc(s.name)}"><div class="nm">${esc(s.name)}</div><div class="tg">${esc(s.tagline || '')}</div>
-      <div class="tg">${s.out ? 'คัดออกแล้ว' : s.rank ? esc(prizeName(s.rank)) : mini ? (s.holders != null ? s.holders + ' ท่าน' : '') : ''}</div></div>`).join('')}</div>`;
+      <div class="tg">${s.out ? 'คัดออกแล้ว' : s.rank && spin ? esc(prizeName(s.rank)) : mini ? (s.holders != null ? s.holders + ' ท่าน' : '') : ''}</div></div>`).join('')}</div>`;
   }
 
   // ---------- ป๊อปอัปผู้โชคดี + นับถอยหลัง ----------
@@ -241,9 +264,10 @@
     const total = claimSec, startAt = fresh || !pd.at ? Date.now() : Math.min(Date.now(), new Date(pd.at).getTime() + WHEEL_MS);
     const C = Math.round(2 * Math.PI * 54);
     const winName = (draw.series.find(s => s.code === pd.card) || {}).name || '';
+    const z = Object.assign({}, prizeById(pd.prize_id), draw.next_prize && draw.next_prize.id === pd.prize_id ? draw.next_prize : {});
     m.innerHTML = `<div class="modal"><div class="mbox">
-      <div class="eyebrow" style="letter-spacing:6px">WINNER · รางวัลที่ ${pd.rank}</div>
-      <div class="prow">${prizeImg(pd.rank, 'mi')}<div><div class="pz">${esc(pd.prize || prizeName(pd.rank))}</div>${prizeOf(pd.rank).description ? `<div class="pd">${esc(prizeOf(pd.rank).description)}</div>` : ''}</div></div>
+      <div class="eyebrow" style="letter-spacing:6px">WINNER · ${prizeLabel(Object.assign({ rank: pd.rank }, z))}</div>
+      <div class="prow">${imgTag(pd.image || z.image, 'mi')}<div><div class="pz">${esc(pd.prize || z.name || prizeName(pd.rank))}</div>${(pd.description || z.description) ? `<div class="pd">${esc(pd.description || z.description)}</div>` : ''}</div></div>
       <div class="tk">${esc(pd.ticket_no)}</div>
       <div class="nm">${esc(pd.name)}</div>
       <div style="color:var(--ink2)">กรุณาขึ้นมาบนเวทีภายในเวลา</div>
@@ -270,8 +294,8 @@
     ['.ring', '.mbtns', '.hint'].forEach(q => { const e = box.querySelector(q); if (e) e.remove(); });
     if (present) {
       box.querySelector('.eyebrow').textContent = 'CONGRATULATIONS'; box.querySelector('.pz').textContent = `ยินดีด้วย! รับ ${pd.prize || prizeName(pd.rank)}`;
-      if (pd.rank === 1) { fanfare(); whiteout(); confetti(420, true); setTimeout(() => confetti(300, true), 700); } else { ding(); confetti(160, true); }
-      await sleep(pd.rank === 1 ? 4200 : 2800);
+      if (pd.rank === 1) { fanfare(); whiteout(); confetti(420, true); setTimeout(() => confetti(300, true), 700); setTimeout(() => confetti(300, true), 1600); } else { sting(); confetti(220, true); setTimeout(() => confetti(120, true), 500); }
+      await sleep(pd.rank === 1 ? 5200 : 3200);
     } else {
       box.querySelector('.eyebrow').textContent = 'NO SHOW'; box.querySelector('.pz').textContent = 'ไม่อยู่ในงาน · ตัดสิทธิ์ แล้วหมุนใหม่'; thud(); await sleep(1600);
     }
@@ -283,7 +307,7 @@
     const [r, info] = await Promise.all([rpc('final_state', { p_token: me.token }), rpc('event_info', {})]);
     if (!r || !r.ok) { toast(msg(r), 'err'); return; }
     prizes = r.prizes; draw = r.draw; claimSec = r.claim_sec || 60;
-    K._series = (info && info.series || []).map(s => Object.assign({ out: false, winner: false }, s));
+    K._series = (info && info.series || []).map(s => Object.assign({ out: false, in: false }, s));
     render();
   }
 
@@ -305,31 +329,24 @@
   async function animate(prev, next) {
     if (!prev) return;
     const $$ = sel => Array.from(document.querySelectorAll(sel));
-    if (prev.phase === 'cut') {                              // คัดการ์ดออก 1 ใบ
-      const gone = next.series.find(s => s.out && !prev.series.find(p => p.code === s.code).out); if (!gone) return;
-      const live = $$('.scard:not(.out)'), target = live.find(e => e.dataset.code === gone.code);
-      const last = next.phase !== 'cut';
-      setHead(last ? 'การ์ดใบสุดท้ายที่จะถูกคัดออก…' : 'กำลังคัดการ์ดออก…', true); drumroll(last ? 4600 : 3800); await roulette(live, target, last ? 4600 : 3800);
-      setHead('การ์ด ' + gone.name + ' … เข้ารอบ หรือ ตกรอบ?  (กด Space เปิดผล)', true); await hold(HOLD_MS);   // ค้างให้พิธีกรพูด
-      setHead('การ์ด ' + gone.name + ' ถูกคัดออก!'); await eliminate(target, 'OUT');
-      if (last) { const restS = next.series.filter(s => !s.out); $$('.scard:not(.out)').forEach(e => e.classList.add('win')); ding(); confetti(160, true);
-        setHead('เหลือ ' + restS.length + ' การ์ด: ' + restS.map(s => s.name).join(' · ') + ' · ทุกใบมีรางวัล!'); await sleep(2600); }
+    if (prev.phase === 'cut' && next.step > prev.step) {       // เปิดการ์ด 1 ใบ (OUT หรือ IN ตามลำดับที่ล็อกไว้ · สุ่มว่าใบไหน)
+      const k = next.step, kind = OPEN_KIND[k];
+      const opened = next.series.find(s => s.pos === k); if (!opened) return;
+      const live = $$('.scard:not(.out):not(.in)'), target = live.find(e => e.dataset.code === opened.code);
+      if (!target) return;
+      const last = k === 5;
+      setHead(`เปิดการ์ดใบที่ ${k} … ใบไหน?`, true); drumroll(last ? 4600 : 3800); riser(last ? 4600 : 3800); await roulette(live, target, last ? 4600 : 3800);
+      gong(); setHead('การ์ด ' + opened.name + ' … เข้ารอบ หรือ ตกรอบ?  (กด Space เปิดผล)', true); await hold(HOLD_MS);   // ค้างให้พิธีกรพูด
+      if (kind === 'out') { setHead('การ์ด ' + opened.name + ' ตกรอบ!'); await eliminate(target); }
+      else { setHead('การ์ด ' + opened.name + ' เข้ารอบ!'); await admit(target, 'IN'); }
+      if (last) { const ins = next.series.filter(s => s.in).sort((a, b) => a.rank - b.rank); $$('.scard.in').forEach(e => e.classList.add('win')); fanfare(); confetti(360, true);
+        setHead('เข้ารอบ 3 การ์ด: ' + ins.map(s => s.name + ' = รางวัลที่ ' + s.rank).join(' · ')); await sleep(4200); }
       return;
     }
-    if (prev.phase === 'reveal' && next.next_card) {         // เปิดการ์ดของรางวัลนี้
-      const r = next.next_rank;
-      const live = $$('.scard:not(.out):not(.ranked)'), target = live.find(e => e.dataset.code === next.next_card);
-      const nm = next.series.find(s => s.code === next.next_card).name;
-      if (live.length > 1) { setHead(`รางวัลที่ ${r} · ${prizeName(r)} · การ์ดใบไหน?`, true); drumroll(3600); await roulette(live, target, 3600);
-        setHead(`การ์ด ${nm} … ได้รางวัลที่ ${r} หรือไม่?  (กด Space เปิดผล)`, true); await hold(HOLD_MS); }
-      else { target.classList.add('spot'); await sleep(600); }
-      target.classList.remove('spot'); target.classList.add('flash', 'pick'); stamp(target, 'รางวัลที่ ' + r, true); ding(); confetti(120);
-      setHead(`รางวัลที่ ${r} · ${prizeName(r)} ไปที่ผู้ถือการ์ด ${nm}!`); await sleep(2200); return;
-    }
     if (next.pending && !prev.pending) {                     // หมุนวงล้อ
-      const pd = next.pending; setHead(`รางวัลที่ ${pd.rank} · ${prizeName(pd.rank)} · วงล้อกำลังหมุน…`, true);
-      const lad = document.querySelector(`.lad[data-rank="${pd.rank}"] .st`); if (lad) lad.textContent = 'กำลังหมุน…';
-      await Wheel.spin(pd.ticket_no); ding(); confetti(90); justSpun = true;
+      const pd = next.pending, np = next.next_prize || {}; setHead(`${prizeLabel(np)} · ${pd.prize || ''} · วงล้อกำลังหมุน…`, true);
+      const lad = document.querySelector(`.lad[data-prize="${pd.prize_id}"] .st`); if (lad) lad.textContent = 'กำลังหมุน…';
+      await Wheel.spin(pd.ticket_no); ding(); shimmer(); confetti(90); justSpun = true;
       setHead(`${pd.ticket_no} · กรุณาขึ้นเวที`); await sleep(600);
     }
   }

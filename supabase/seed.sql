@@ -22,7 +22,8 @@ where st.id = v.n and st.name = 'ฐาน ' || st.id;
 
 -- รางวัลรอบชิง: ประกาศ ที่ 3 → ที่ 2 → ที่ 1 (แก้ชื่อได้ในหลังบ้าน)
 insert into prizes (name, kind, quantity, sort, rank)
-select * from (values ('iPhone', 'final', 1, 1, 1), ('หูฟังครอบหู', 'final', 1, 2, 2), ('หูฟังครอบหู', 'final', 1, 3, 3)) v(name, kind, quantity, sort, rank)
+select * from (values ('iPhone 18 Pro', 'final', 1, 1, 1), ('iPad Gen 11', 'final', 1, 2, 2),
+                      ('หูฟังอินเอียร์ Beyerdynamic', 'final', 1, 3, 3), ('หูฟังไร้สาย KEF Mu7', 'final', 1, 4, 3)) v(name, kind, quantity, sort, rank)
 where not exists (select 1 from prizes);
 
 do $$

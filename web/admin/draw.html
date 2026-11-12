@@ -30,7 +30,7 @@
       </section>
       <section class="lcard">
         <h2>กำหนดลำดับการ์ดล่วงหน้า (ไม่บังคับ)</h2>
-        <div class="sub">ถ้าตั้งไว้ จอเวทีจะคัดการ์ดและมอบรางวัลตามนี้แทนการสุ่ม (ส่วน "คน" ในแต่ละการ์ดยังสุ่มจากวงล้อ) · ต้องตั้งก่อนกด "เริ่มรอบชิง" · ปล่อยเป็น "สุ่ม" ทุกใบ = สุ่มทั้งหมด</div>
+        <div class="sub">ถ้าตั้งไว้ จอเวทีจะเปิดการ์ดตามลำดับนี้แทนการสุ่ม: ใบที่ 1 OUT → ใบที่ 2 IN (รางวัลที่ 3) → ใบที่ 3 OUT → ใบที่ 4 IN (รางวัลที่ 2) → ใบที่ 5 IN (รางวัลที่ 1) · ส่วน "คน" ในแต่ละการ์ดยังสุ่มจากวงล้อ · ต้องตั้งก่อนกด "เริ่มรอบชิง" · ปล่อยเป็น "สุ่ม" ทุกใบ = สุ่มทั้งหมด</div>
         <div id="plan" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px"></div>
         <div class="row" style="margin-top:10px">
           <button class="lbtn primary" id="savePlan">บันทึกลำดับ</button>
@@ -39,9 +39,9 @@
         </div>
       </section>
       <section class="lcard">
-        <div class="head"><h2>รางวัลรอบชิง (3 รางวัล)</h2><button class="lbtn" id="add" hidden>+ เพิ่มรางวัล</button></div>
+        <div class="head"><h2>รางวัลรอบชิง (4 ชิ้น · 3 อันดับ)</h2><button class="lbtn" id="add" hidden>+ เพิ่มรางวัล</button></div>
         <div id="prizes" style="display:flex;flex-direction:column;gap:10px"></div>
-        <div class="sub">คัดการ์ด 5 → 3 แล้วเปิดการ์ดทีละใบให้รางวัลที่ 3 → 2 → 1 หมุนวงล้อจากผู้ถือการ์ดนั้น (แต่ละรางวัลคนละซีรีส์) · รูปและรายละเอียดจะขึ้นบนจอเวที ป๊อปอัปผู้โชคดี และมือถือลูกค้า</div>
+        <div class="sub">เปิดการ์ด 5 ใบ (OUT · IN · OUT · IN · IN) การ์ดที่เข้ารอบ 3 ใบ = รางวัลที่ 3 → 2 → 1 หมุนวงล้อจากผู้ถือการ์ดนั้น · รางวัลที่ 3 มี 2 ชิ้น หมุนวงล้อ 2 รอบจากการ์ดใบเดียวกัน (คนละคน) · รูปและรายละเอียดจะขึ้นบนจอเวที ป๊อปอัปผู้โชคดี และมือถือลูกค้า</div>
       </section>
     </div>
     <section style="display:flex;flex-direction:column;gap:10px">
@@ -69,16 +69,16 @@
   $('#nowCut').onclick = () => { if (confirm('ตัดยอดตอนนี้และปิดรับลงทะเบียนใหม่?')) saveCut(new Date().toISOString()); };
   $('#clearCut').onclick = () => saveCut('');
 
-  function prizeRow(z) {
-    const fin = z && z.kind === 'final';
+  function prizeRow(z, slotRank, slotNote) {
+    const fin = !z || z.kind === 'final';
     return `<div class="row" style="align-items:flex-start;padding:12px;border-radius:12px;background:${fin ? '#F1E6D2' : '#EEEBE5'}" data-id="${z ? z.id : ''}" data-img="${z && z.image ? 'keep' : ''}">
       <div class="pimg" style="width:120px;height:120px;border-radius:12px;background:#fff url('${z && z.image ? z.image : ''}') center/cover no-repeat;border:1px dashed #C9A063;display:flex;align-items:center;justify-content:center;font-size:12px;color:#8A7A5A;text-align:center;flex:none;cursor:pointer" title="คลิกเพื่อเลือกรูป">${z && z.image ? '' : 'คลิกเพิ่มรูป<br>ของรางวัล'}</div>
       <input type="file" accept="image/*" data-k="file" hidden>
       <div style="flex:1 1 320px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
-        <label class="lfield" style="flex:2 1 180px">ชื่อรางวัล<input class="linput" data-k="name" value="${esc(z ? z.name : '')}" placeholder="เช่น iPhone 17 Pro"></label>
+        <label class="lfield" style="flex:2 1 180px">ชื่อรางวัล${slotNote ? ' <span class="sub">(' + slotNote + ')</span>' : ''}<input class="linput" data-k="name" value="${esc(z ? z.name : '')}" placeholder="เช่น iPhone 18 Pro"></label>
         <input type="hidden" data-k="kind" value="final">
         <label class="lfield" style="flex:0 1 110px">อันดับ (รอบชิง)<select class="linput" data-k="rank"><option value="">–</option>
-          ${[1, 2, 3].map(r => `<option value="${r}" ${z && z.rank === r ? 'selected' : ''}>ที่ ${r}</option>`).join('')}</select></label>
+          ${[1, 2, 3].map(r => `<option value="${r}" ${(z ? z.rank : slotRank) === r ? 'selected' : ''}>ที่ ${r}</option>`).join('')}</select></label>
         <input type="hidden" data-k="quantity" value="1">
         <label class="lfield" style="flex:1 1 100%">รายละเอียด (ขึ้นบนจอเวทีและมือถือ)<input class="linput" data-k="description" value="${esc(z && z.description || '')}" placeholder="เช่น 256GB สี Deep Blue มูลค่า 48,900 บาท"></label>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex-basis:100%">
@@ -117,13 +117,12 @@
     const g = k => row.querySelector(`[data-k="${k}"]`).value, im = row.dataset.img;
     const r = await rpc('admin_prize_save', { p_token: me.token, p_id: row.dataset.id ? +row.dataset.id : null, p_name: g('name'), p_kind: g('kind'), p_quantity: +g('quantity'), p_sort: 0, p_rank: g('rank') ? +g('rank') : null,
       p_description: g('description'), p_image: im === 'remove' ? '' : (im && im !== 'keep' ? im : null) });
-    if (r && r.code === 'RANK_TAKEN') { toast('อันดับนี้มีรางวัลอยู่แล้ว', 'err'); return; }
     if (r && r.code === 'BAD_IMAGE') { toast('รูปใหญ่เกินไป ลองรูปที่เล็กลง', 'err'); return; }
     toast(r && r.ok ? 'บันทึกรางวัลแล้ว' : msg(r), r && r.ok ? 'ok' : 'err'); load();
   };
   $('#res').onclick = async e => {
     if (e.target.dataset.replace) {
-      if (!confirm('สุ่มผู้ได้รางวัลที่ ' + e.target.dataset.replace + ' คนใหม่ จากผู้ถือการ์ดใบสุดท้าย?')) return;
+      if (!confirm('สุ่มผู้ได้รางวัลที่ ' + e.target.dataset.replace + ' คนใหม่ จากผู้ถือการ์ดใบเดียวกัน?')) return;
       const r = await rpc('final_replace', { p_token: me.token, p_rank: +e.target.dataset.replace });
       toast(r && r.ok ? 'ผู้ได้รางวัลคนใหม่: ' + r.ticket_no + ' ' + r.name : msg(r), r && r.ok ? 'ok' : 'err'); load(); return;
     }
@@ -137,19 +136,19 @@
     { key: 'series_name', label: 'ซีรีส์' }, { get: x => fmtDateTime(x.drawn_at), label: 'เวลา' }]));
 
   // ---------- ลำดับการ์ดล่วงหน้า ----------
-  const ROLES = [['', 'สุ่ม'], ['out1', 'คัดออกใบที่ 1'], ['out2', 'คัดออกใบที่ 2'], ['r3', 'รางวัลที่ 3'], ['r2', 'รางวัลที่ 2'], ['r1', 'รางวัลที่ 1']];
-  const ORDER_SLOT = { out1: 0, out2: 1, r3: 2, r2: 3, r1: 4 };    // ตำแหน่งใน series_order (1..2 = ออก, 6-r = รางวัลที่ r)
+  const ROLES = [['', 'สุ่ม'], ['out1', 'ใบที่ 1 · OUT'], ['r3', 'ใบที่ 2 · IN รางวัลที่ 3'], ['out2', 'ใบที่ 3 · OUT'], ['r2', 'ใบที่ 4 · IN รางวัลที่ 2'], ['r1', 'ใบที่ 5 · IN รางวัลที่ 1']];
+  const ORDER_SLOT = { out1: 0, r3: 1, out2: 2, r2: 3, r1: 4 };    // ตำแหน่งใน series_order = ลำดับเปิดการ์ด (1 OUT · 2 IN=ที่ 3 · 3 OUT · 4 IN=ที่ 2 · 5 IN=ที่ 1)
   function renderPlan(order, bySeries) {
     const roleOf = code => { if (!order) return ''; const i = order.indexOf(code); return i < 0 ? '' : Object.keys(ORDER_SLOT).find(k => ORDER_SLOT[k] === i) || ''; };
     const SER = [['U', 'UNO'], ['I', 'IKON'], ['F', 'FORMA'], ['N', 'NOVA'], ['C', 'CASA']];
     $('#plan').innerHTML = SER.map(([c, n]) => { const cnt = (bySeries.find(b => b.code === c) || {}).count; return `<label class="lfield">${n}${cnt != null ? ' <span class="sub">(' + cnt + ' คน)</span>' : ''}
       <select class="linput" data-plan="${c}">${ROLES.map(([v, t]) => `<option value="${v}" ${roleOf(c) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`; }).join('');
-    $('#planStatus').textContent = order && order.length === 5 ? 'ล็อกไว้: ' + order.map((c, i) => (SER.find(x => x[0] === c) || [c, c])[1] + ' ' + ['ออก 1', 'ออก 2', 'ที่ 3', 'ที่ 2', 'ที่ 1'][i]).join(' · ') : 'ยังไม่ได้ล็อก (สุ่มทั้งหมด)';
+    $('#planStatus').textContent = order && order.length === 5 ? 'ล็อกไว้: ' + order.map((c, i) => (SER.find(x => x[0] === c) || [c, c])[1] + ' ' + ['OUT', 'IN ที่ 3', 'OUT', 'IN ที่ 2', 'IN ที่ 1'][i]).join(' · ') : 'ยังไม่ได้ล็อก (สุ่มทั้งหมด)';
   }
   $('#savePlan').onclick = async () => {
     const sel = [...document.querySelectorAll('[data-plan]')]; const order = new Array(5).fill(null); const used = {};
     for (const el of sel) { const v = el.value; if (!v) continue; if (used[v]) { toast('ตั้ง "' + ROLES.find(r => r[0] === v)[1] + '" ซ้ำ 2 ใบ', 'err'); return; } used[v] = 1; order[ORDER_SLOT[v]] = el.dataset.plan; }
-    if (order.some(x => !x)) { toast('ต้องกำหนดให้ครบทั้ง 5 ใบ (คัดออก 2 ใบ + รางวัลที่ 3, 2, 1) หรือกด "ล้าง" เพื่อสุ่ม', 'err'); return; }
+    if (order.some(x => !x)) { toast('ต้องกำหนดให้ครบทั้ง 5 ใบ (OUT 2 ใบ + IN รางวัลที่ 3, 2, 1) หรือกด "ล้าง" เพื่อสุ่ม', 'err'); return; }
     const r = await rpc('admin_settings_save', { p_token: me.token, p: { final_order: order } });
     toast(r && r.ok ? 'บันทึกลำดับการ์ดแล้ว · มีผลเมื่อกด "เริ่มรอบชิง" ครั้งถัดไป' : msg(r), r && r.ok ? 'ok' : 'err'); load();
   };
@@ -162,11 +161,14 @@
     if (st && st.ok) renderPlan(st.settings.final_order, el && el.ok ? el.by_series : []);
     if (el && el.ok) $('#elig').innerHTML = `<div class="lnotice ok">ผู้มีสิทธิ์ลุ้นตอนนี้ <b>${el.eligible}</b> คน · ${el.by_series.map(s => esc(s.name) + ' ' + s.count).join(' · ')}</div>`;
     if (pz && pz.ok) { const fin = pz.rows.filter(z => z.kind === 'final');
-      $('#prizes').innerHTML = [1, 2, 3].map(r => { const z = fin.find(x => x.rank === r); return z ? prizeRow(z) : prizeRow(null).replace('<option value="' + r + '" >', '<option value="' + r + '" selected>'); }).join(''); }
+      const byRank = r => fin.filter(x => x.rank === r).sort((a, b) => a.id - b.id);
+      const slots = [[1, 0, ''], [2, 0, ''], [3, 0, 'ชิ้นที่ 1 · หมุนรอบแรก'], [3, 1, 'ชิ้นที่ 2 · หมุนรอบสอง']];
+      $('#prizes').innerHTML = slots.map(([r, i, note]) => prizeRow(byRank(r)[i] || null, r, note)).join('')
+        + fin.filter(z => !slots.some(([r, i]) => byRank(r)[i] && byRank(r)[i].id === z.id)).map(z => prizeRow(z, z.rank, 'เกินจำนวน · ตั้งอันดับใหม่หรือลบชื่อ')).join(''); }
     if (rs && rs.ok) { results = rs.rows;
       $('#res').innerHTML = rs.rows.map(x => `<tr><td>${x.rank ? 'ที่ ' + x.rank + ' · ' : ''}${esc(x.prize)}</td><td style="letter-spacing:1px">${esc(x.ticket_no)}</td><td>${esc(x.name)}</td><td>${esc(x.phone)}</td>
         <td>${esc(x.series_name)}</td><td class="sub">${fmtDateTime(x.drawn_at)}</td>
-        <td>${x.voided ? '<span class="pill void">ยกเลิกแล้ว</span>' + (x.rank && !rs.rows.some(y => y.rank === x.rank && !y.voided) ? ` <button class="lbtn" data-replace="${x.rank}" style="min-height:36px">สุ่มแทน</button>` : '') : `<button class="lbtn danger" data-void="${x.id}" style="min-height:36px">ยกเลิกสิทธิ์</button>`}</td></tr>`).join('') || '<tr><td colspan="7" class="sub">ยังไม่มีผลการจับฉลาก</td></tr>'; }
+        <td>${x.voided ? '<span class="pill void">ยกเลิกแล้ว</span>' + (x.rank && !rs.rows.some(y => y.prize_id === x.prize_id && !y.voided) ? ` <button class="lbtn" data-replace="${x.rank}" style="min-height:36px">สุ่มแทน</button>` : '') : `<button class="lbtn danger" data-void="${x.id}" style="min-height:36px">ยกเลิกสิทธิ์</button>`}</td></tr>`).join('') || '<tr><td colspan="7" class="sub">ยังไม่มีผลการจับฉลาก</td></tr>'; }
   }
   load();
 })();
