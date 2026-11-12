@@ -23,6 +23,16 @@
   .scard.pick { border-color:var(--gold); box-shadow:0 0 60px rgba(201,160,99,.55) }
   .scard.ranked:not(.pick) { opacity:.55 }
   .scard.in { border-color:var(--gold) }
+  .intro { position:fixed; inset:0; z-index:40; background:radial-gradient(ellipse at 50% 0%, #2A2620 0%, #0A0A0A 70%); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2.2vh; text-align:center; padding:4vh 6vw }
+  .intro[hidden] { display:none }
+  .intro .ilogo { width:min(22vw, 300px); height:auto }
+  .intro .ihead { font-size:clamp(28px, 4vw, 64px); font-weight:500; line-height:1.15 }
+  .intro .isub { font-size:clamp(16px, 1.6vw, 28px); color:var(--ink2); max-width:1100px }
+  .intro .iqr { background:#fff; padding:2vh; border-radius:28px; box-shadow:0 0 0 6px var(--gold), 0 30px 80px rgba(0,0,0,.6) }
+  .intro .iqr svg { width:min(44vh, 40vw); height:min(44vh, 40vw); display:block }
+  .intro .iurl { font-size:clamp(18px, 2vw, 34px); letter-spacing:2px; color:var(--gold) }
+  .intro .ihint { font-size:clamp(14px, 1.3vw, 22px); color:var(--ink3) }
+  .intro .ibtns { display:flex; gap:12px }
   .stamp.still { animation:none; opacity:1; transform:translate(-50%,-50%) rotate(-12deg) scale(1) }
   .cards5.mini .stamp.still { top:50% }
   .scard .rkb { position:absolute; top:10px; left:10px; z-index:2; background:var(--gold); color:#121212; font-size:clamp(11px,.9vw,16px); font-weight:500; padding:4px 10px; border-radius:12px; letter-spacing:1px }
@@ -98,13 +108,24 @@
   </div>
 </div>
 <div id="modal" hidden></div>
+<!-- หน้าแรกก่อนเริ่มรอบชิง: QR ใหญ่ให้ผู้ร่วมงานสแกนกลับเข้าการ์ดของตัวเอง (เผื่อปิดเว็บไปแล้ว) -->
+<div id="intro" class="intro" hidden>
+  <img src="/assets/logo-white.png" alt="KLIQ" class="ilogo">
+  <div class="ihead">สแกนเพื่อดูการ์ด KLIQ ของคุณ</div>
+  <div class="isub">ปิดหน้าเว็บไปแล้ว? สแกนแล้วกรอกเบอร์โทรที่ลงทะเบียนไว้ การ์ดและหมายเลขลุ้นโชคของคุณจะกลับมาทันที</div>
+  <div class="iqr" id="iqr"></div>
+  <div class="iurl" id="iurl"></div>
+  <div class="ihint">ผู้ถือการ์ดทุกใบมีสิทธิ์ลุ้น iPhone 18 Pro Max และรางวัลใหญ่บนเวที · ต้องอยู่ในงานเพื่อรับรางวัล</div>
+  <div class="ibtns"><button class="stagebtn" id="introGo">ไปต่อ → ลุ้นรางวัล</button></div>
+</div>
 <canvas id="confetti" aria-hidden="true"></canvas>
 <button class="snd" id="snd" title="เปิด/ปิดเสียง (M)" aria-label="เปิด/ปิดเสียง">🔊</button>
+<script src="/vendor/qrcode.js"></script>
 <script src="/config.js"></script>
 <script src="/app.js"></script>
 <script>
 (async function () {
-  const { $, rpc, msg, esc, STAFF, toast, seriesImg, inkFor } = K;
+  const { $, rpc, msg, esc, STAFF, toast, seriesImg, inkFor, qrSvg } = K;
   const me = await STAFF.guard(['mc']);
   if (!me) return;
   let draw = null, prizes = [], claimSec = 60, working = false, timer = null, justSpun = false;   // justSpun: ป๊อปอัปเปิดต่อจากวงล้อในเครื่องนี้ → เริ่มนับ 30 วิเต็มตอนป๊อปอัปขึ้น
@@ -307,13 +328,13 @@
   }
 
   // ---------- ขั้นตอนหลัก (ปุ่ม / Space) ----------
-  async function load() {
+  let load = async function () {
     const [r, info] = await Promise.all([rpc('final_state', { p_token: me.token }), rpc('event_info', {})]);
     if (!r || !r.ok) { toast(msg(r), 'err'); return; }
     prizes = r.prizes; draw = r.draw; claimSec = r.claim_sec || 60;
     K._series = (info && info.series || []).map(s => Object.assign({ out: false, in: false }, s));
     render();
-  }
+  };
 
   async function step() {
     if (working || (draw && (draw.done || draw.pending))) return;
@@ -367,10 +388,21 @@
     }
   }
 
+  // หน้า QR ก่อนเริ่ม: แสดงเมื่อยังไม่มีรอบชิง (หรือเปิดด้วย ?qr=1 / กด Q) · กด "ไปต่อ" หรือ Space เพื่อเข้าหน้าลุ้นรางวัล
+  const Intro = {
+    show() { const u = location.origin + '/'; $('#iqr').innerHTML = qrSvg(u, 800); $('#iurl').textContent = u.replace(/^https?:\/\//, '').replace(/\/$/, ''); $('#intro').hidden = false; },
+    hide() { $('#intro').hidden = true; },
+    open() { return !$('#intro').hidden; }
+  };
+  $('#introGo').onclick = () => { Intro.hide(); tick(); };
+  const _load = load;
+  load = async function () { await _load(); if (!draw || new URLSearchParams(location.search).get('qr') === '1') Intro.show(); };
   $('#go').onclick = () => { $('#go').blur(); if (!releaseHold()) step(); };
   $('#fs').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
   document.addEventListener('keydown', e => {
     const modalOpen = !$('#modal').hidden;
+    if (Intro.open()) { if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); if (!e.repeat) Intro.hide(); } return; }
+    if (e.key === 'q' || e.key === 'Q') { if (!working) Intro.show(); return; }
     if (modalOpen) { if (e.key === 'Enter') { e.preventDefault(); claim(true); } if (e.key === 'n' || e.key === 'N') claim(false); return; }
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
     if (e.code === 'Space' && !typing) { e.preventDefault(); if (e.repeat) return; if (!releaseHold()) step(); return; }   // Space ใช้ได้ทุกที่ ไม่เลื่อนหน้า

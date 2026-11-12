@@ -50,7 +50,7 @@ async def main():
         await a.fill('#code', 'admin01'); await a.fill('#pin', '246810'); await a.click('#b')
         await a.wait_for_url('**/admin/index.html')
         await a.wait_for_selector('.kpi')
-        check('admin dashboard loads', await a.locator('.kpi').count() == 5)
+        check('admin dashboard loads', await a.locator('.kpi').count() == 6)
 
         await a.goto(BASE + '/admin/settings.html'); await a.wait_for_selector('#staff tr')
         await a.fill('#min_stamp_interval_sec', '0'); await a.click('#sf button[type=submit]')
@@ -199,6 +199,11 @@ async def main():
         await m.wait_for_url('**/stage/index.html'); await m.wait_for_selector('#list a')
         await shot(m, '11_stage_menu', False)
         await m.click('#list a >> nth=0'); await m.wait_for_url('**/stage/final.html'); await m.wait_for_selector('#go:not([disabled])')
+        await m.wait_for_selector('#intro:not([hidden]) #iqr svg')
+        check('stage opens with big QR intro (scan to get your card back)', await m.locator('#iqr svg').count() == 1 and 'สแกน' in await m.inner_text('#intro'))
+        await shot(m, '12a_stage_qr_intro', False)
+        await m.click('#introGo'); await m.wait_for_timeout(300)
+        check('intro closes on ไปต่อ', await m.locator('#intro').is_hidden())
         await shot(m, '12_final_ready', False)
         ready = lambda: m.wait_for_selector('#go:not([disabled])', timeout=40000)
         await m.click('#go'); await ready()
@@ -253,7 +258,7 @@ async def main():
         check('final: 4 winners on 3 different cards, button finished', await m.locator('.lad.won').count() == 4 and await m.is_disabled('#go') and db("select count(distinct p.series_code) from draw_results r join participants p on p.id=r.participant_id join prizes z on z.id=r.prize_id where z.kind='final' and not r.voided") == '3')
         await shot(m, '14f_final_done', False)
         await m.goto(BASE + '/stage/index.html'); await m.wait_for_selector('#list a')
-        check('stage menu shows only the grand final', await m.locator('#list a').count() == 1 and 'ประกาศผลแล้ว' in await m.inner_text('#list'))
+        check('stage menu shows only the grand final', await m.locator('#list a').count() == 2 and 'ประกาศผลแล้ว' in await m.inner_text('#list'))
         await shot(m, '15_stage_menu', False)
 
         # winner sees banner

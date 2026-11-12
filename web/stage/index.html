@@ -35,7 +35,11 @@
   $('#list').innerHTML = (fin.length ? `<a href="/stage/final.html" class="card" style="text-decoration:none;color:var(--ink);border:1px solid var(--gold);grid-column:1/-1">
     <span class="eyebrow">GRAND FINAL · เปิดการ์ด 5 ใบ (OUT · IN · IN · OUT · IN) → หมุนวงล้อ รางวัลที่ 3 · 3 · 2 · 1</span>
     <b style="font-size:30px;font-weight:500">รอบชิงรางวัลใหญ่</b>
-    <span class="muted">${fin.map(z => 'ที่ ' + z.rank + ' ' + esc(z.name)).join(' · ')}${finDone ? ' · ประกาศผลแล้ว' : ''}</span></a>` : `<div class="notice err">ยังไม่ได้ตั้งรางวัลรอบชิง ไปที่หลังบ้าน → Lucky Draw</div>`);
+    <span class="muted">${fin.map(z => 'ที่ ' + z.rank + ' ' + esc(z.name)).join(' · ')}${finDone ? ' · ประกาศผลแล้ว' : ''}</span></a>
+  <a href="/stage/final.html?qr=1" class="card" style="text-decoration:none;color:var(--ink);grid-column:1/-1">
+    <span class="eyebrow">ก่อนเริ่ม · หน้า QR สำหรับผู้ร่วมงาน</span>
+    <b style="font-size:24px;font-weight:500">QR สแกนดูการ์ดของตัวเอง</b>
+    <span class="muted">ขึ้น QR ใหญ่เต็มจอให้คนที่ปิดเว็บไปแล้วสแกนกลับเข้าการ์ด · กด "ไปต่อ" หรือ Space เพื่อเข้าหน้าลุ้นรางวัล (กด Q บนหน้าเวทีเพื่อเรียกขึ้นมาอีก)</span></a>` : `<div class="notice err">ยังไม่ได้ตั้งรางวัลรอบชิง ไปที่หลังบ้าน → Lucky Draw</div>`);
 })();
 </script>
 </body>
