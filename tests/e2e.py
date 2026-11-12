@@ -249,7 +249,7 @@ async def main():
         wctx, wp = await page_in(b)
         await wp.goto(BASE + '/'); await wp.evaluate(f"localStorage.setItem('kliq_pt', '{wtok}')")
         await wp.goto(BASE + '/passport.html'); await wp.wait_for_selector('.win')
-        check('winner sees banner on phone', 'iPhone 18 Pro' in await wp.inner_text('.win') and await wp.locator('.win img').count() == 1)
+        check('winner sees banner on phone', 'iPhone 18 Pro Max' in await wp.inner_text('.win') and await wp.locator('.win img').count() == 1)
         await shot(wp, '16_passport_winner', True)
 
         # ---------- admin pages
