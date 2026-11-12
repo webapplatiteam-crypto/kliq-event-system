@@ -155,13 +155,23 @@ td { padding: 11px 14px; border-top: 1px solid #ECE8E1; vertical-align: middle; 
 .qrgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
 .qrcard { background: #fff; border: 1px solid var(--l-line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
 .qrcard .qr { display: flex; justify-content: center; } .qrcard .qr svg { width: 200px; height: 200px; }
+/* พิมพ์ป้าย QR: 1 ฐาน = 1 หน้า A4 เต็มใบ (โลโก้ · QR ใหญ่ · ชื่อฐาน) */
+@page { size: A4 portrait; margin: 0; }
+.qrcard .printlogo { display: none; }
 @media print {
-  .side, .noprint, .toast { display: none !important; }
-  body.light { background: #fff; }
-  .main { padding: 0; }
-  .qrgrid { grid-template-columns: 1fr 1fr; gap: 10mm; }
-  .qrcard { break-inside: avoid; border: 1px solid #999; padding: 8mm; text-align: center; }
-  .qrcard .qr svg { width: 70mm; height: 70mm; }
+  .side, .noprint, .toast, .head, .lnotice { display: none !important; }
+  html, body, body.light { background: #fff !important; margin: 0; }
+  .layout, .main { display: block; padding: 0; margin: 0; max-width: none; }
+  .qrgrid { display: block; }
+  .qrcard { break-after: page; page-break-after: always; break-inside: avoid; border: 0; border-radius: 0; opacity: 1 !important;
+    width: 210mm; height: 297mm; box-sizing: border-box; padding: 24mm 20mm; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10mm; text-align: center; }
+  .qrcard:last-child { break-after: auto; page-break-after: auto; }
+  .qrcard .printlogo { display: block; width: 60mm; height: auto; }
+  .qrcard .qr svg { width: 150mm; height: 150mm; }
+  .qrcard .pill { font-size: 14pt; padding: 3mm 8mm; }
+  .qrcard b { font-size: 30pt !important; letter-spacing: 2px; }
+  .qrcard .sub { font-size: 14pt; }
+  .qrcard.hideprint { display: none !important; }
 }
 
 /* ---------- stage (TV) ---------- */

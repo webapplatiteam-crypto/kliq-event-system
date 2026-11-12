@@ -14,7 +14,7 @@
   <main class="main">
     <div class="head noprint">
       <div><h1>ฐานกิจกรรม &amp; QR Code</h1><div class="sub">QR ฐานให้เจ้าหน้าที่ถือไว้ ยื่นให้สแกนหลังลูกค้าทำกิจกรรมเสร็จ</div></div>
-      <button class="lbtn primary" onclick="print()">พิมพ์ QR ทั้งหมด</button>
+      <button class="lbtn primary" onclick="print()">พิมพ์ QR ทั้งหมด (1 ฐาน = 1 หน้า A4)</button>
     </div>
     <div class="lnotice noprint">ห้ามติด QR ฐานไว้ให้ถ่ายรูปได้ ถ้า QR หลุดออกไป กด "เปลี่ยน QR ใหม่" แล้วพิมพ์ใหม่ QR เดิมจะใช้ไม่ได้ทันที</div>
     <div class="qrgrid" id="grid"></div>
@@ -33,18 +33,20 @@
   async function load() {
     const r = await rpc('admin_stations', { p_token: me.token });
     if (!r || !r.ok) { $('#grid').innerHTML = `<div class="lnotice">${esc(msg(r))}</div>`; return; }
-    const reg = `<div class="qrcard"><div style="display:flex;justify-content:space-between;align-items:center"><span class="pill wait">REGISTER</span><span class="sub">ติดป้ายได้</span></div>
+    const reg = `<div class="qrcard" data-card="register"><img class="printlogo" src="/assets/logo-black.png" alt="KLIQ"><div style="display:flex;justify-content:space-between;align-items:center"><span class="pill wait">REGISTER</span><span class="sub noprint">ติดป้ายได้</span></div>
       <div class="qr">${qrSvg(origin + '/', 200)}</div>
       <div style="text-align:center"><b style="font-size:20px;font-weight:500">จุดลงทะเบียน</b><div class="sub">สแกนเพื่อลงทะเบียนลุ้น iPhone</div></div>
-      <button class="lbtn noprint" data-dl="register" data-url="${esc(origin + '/')}">ดาวน์โหลด SVG</button></div>`;
+      <div class="row noprint"><button class="lbtn" data-print="register">พิมพ์ใบนี้</button><button class="lbtn" data-png="register" data-title="จุดลงทะเบียน" data-sub="สแกนเพื่อลงทะเบียนลุ้น iPhone" data-url="${esc(origin + '/')}">ดาวน์โหลด PNG</button><button class="lbtn" data-dl="register" data-url="${esc(origin + '/')}">SVG</button></div></div>`;
     $('#grid').innerHTML = reg + r.rows.map((s, i) => {
       const url = origin + '/s.html?t=' + encodeURIComponent(s.qr_token);
-      return `<div class="qrcard" style="${s.active ? '' : 'opacity:.55'}">
+      return `<div class="qrcard" data-card="${s.id}" style="${s.active ? '' : 'opacity:.55'}">
+        <img class="printlogo" src="/assets/logo-black.png" alt="KLIQ">
         <div style="display:flex;justify-content:space-between;align-items:center"><span class="pill done">ฐาน ${i + 1}</span>
           <span class="sub noprint">${s.active ? '● เปิดใช้งาน' : '○ ปิดอยู่'} · แสตมป์ ${s.count} คน</span></div>
         <div class="qr">${qrSvg(url, 200)}</div>
         <div style="text-align:center"><b style="font-size:20px;font-weight:500">${esc(s.name)}</b><div class="sub">สแกนรับแสตมป์ · KLIQ Exhibition Journey</div></div>
         <div class="noprint" style="display:flex;flex-direction:column;gap:8px">
+          <div class="row"><button class="lbtn" data-print="${s.id}">พิมพ์ใบนี้</button><button class="lbtn" data-png="${s.id}" data-title="${esc(s.name)}" data-sub="ฐาน ${i + 1} · สแกนรับแสตมป์" data-url="${esc(url)}">ดาวน์โหลด PNG</button></div>
           <label class="lfield">ชื่อฐาน<input class="linput" value="${esc(s.name)}" data-name="${s.id}"></label>
           <div class="row">
             <button class="lbtn" data-save="${s.id}">บันทึกชื่อ</button>
@@ -54,9 +56,29 @@
           </div></div></div>`;
     }).join('');
   }
+  // โปสเตอร์ PNG 1 ใบ (A4 สัดส่วน 2480×3508): โลโก้ · QR ใหญ่ · ชื่อฐาน — เอาไปสั่งพิมพ์ที่ร้านได้
+  async function pngPoster(title, sub, url, filename) {
+    const W = 2480, H = 3508, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+    const logo = new Image(); logo.src = '/assets/logo-black.png'; await new Promise(r => { logo.onload = r; logo.onerror = r; });
+    if (logo.width) { const lw = 760, lh = lw * logo.height / logo.width; g.drawImage(logo, (W - lw) / 2, 300, lw, lh); }
+    const svg = new Blob([qrSvg(url, 1700)], { type: 'image/svg+xml' }); const qi = new Image(); qi.src = URL.createObjectURL(svg); await new Promise(r => { qi.onload = r; qi.onerror = r; });
+    g.drawImage(qi, (W - 1700) / 2, 800, 1700, 1700); URL.revokeObjectURL(qi.src);
+    g.fillStyle = '#111'; g.textAlign = 'center'; g.font = '500 150px Kanit, sans-serif'; g.fillText(title, W / 2, 2760);
+    g.fillStyle = '#6B6660'; g.font = '300 72px Kanit, sans-serif'; g.fillText(sub, W / 2, 2880);
+    g.fillStyle = '#8A6A3C'; g.font = '400 54px Kanit, sans-serif'; g.fillText('KLIQ GRAND LAUNCH EXPERIENCE', W / 2, 3180);
+    c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }, 'image/png');
+  }
+
   $('#grid').onclick = async e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.dl) { download('kliq-qr-' + b.dataset.dl + '.svg', qrSvg(b.dataset.url, 800), 'image/svg+xml'); return; }
+    if (b.dataset.print) {   // พิมพ์เฉพาะใบนี้: ซ่อนใบอื่นชั่วคราว
+      document.querySelectorAll('.qrcard').forEach(c => c.classList.toggle('hideprint', c.dataset.card !== b.dataset.print));
+      const undo = () => document.querySelectorAll('.qrcard').forEach(c => c.classList.remove('hideprint'));
+      addEventListener('afterprint', undo, { once: true }); print(); setTimeout(undo, 1500); return;
+    }
+    if (b.dataset.png) { await pngPoster(b.dataset.title, b.dataset.sub, b.dataset.url, 'kliq-qr-' + b.dataset.png + '.png'); return; }
     const id = +(b.dataset.save || b.dataset.toggle || b.dataset.rotate);
     if (!id) return;
     const nameEl = document.querySelector(`[data-name="${id}"]`);
