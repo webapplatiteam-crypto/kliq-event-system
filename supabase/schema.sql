@@ -608,7 +608,7 @@ declare s staff; r jsonb; ph text; ok int := 0; bad jsonb := '[]'::jsonb; ser te
 begin
   s := _staff_from_token(p_token, array[]::text[]);
   if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
-  if p_replace then delete from preregistrations; end if;
+  if p_replace then delete from preregistrations where true; end if;   -- Supabase บล็อก DELETE ที่ไม่มี WHERE
   for r in select * from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) loop
     ph := _norm_phone(r->>'phone');
     if ph is null or nullif(trim(r->>'name'), '') is null then
