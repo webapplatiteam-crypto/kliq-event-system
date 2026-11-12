@@ -624,6 +624,59 @@ begin
                from (select * from base order by arrived_at desc nulls last, name limit p_limit offset p_offset) x)));
 end $$;
 
+-- ===== แอดมินแก้ไขข้อมูลผู้ร่วมงาน / รายชื่อล่วงหน้า (กรณีกรอกผิด) — admin เท่านั้น =====
+create or replace function admin_participant_update(p_token text, p_ref_code text, p_name text, p_phone text,
+                                                    p_email text default null, p_company text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare s staff; p participants; ph text := _norm_phone(p_phone); nm text := nullif(trim(coalesce(p_name,'')), '');
+begin
+  s := _staff_from_token(p_token, array[]::text[]);
+  if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
+  select * into p from participants where ref_code = upper(trim(coalesce(p_ref_code,'')));
+  if p.id is null then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  if nm is null then return jsonb_build_object('ok', false, 'code', 'NEED_NAME'); end if;
+  if ph is null then return jsonb_build_object('ok', false, 'code', 'BAD_PHONE'); end if;
+  if ph <> p.phone and exists (select 1 from participants x where x.phone = ph and x.id <> p.id) then
+    return jsonb_build_object('ok', false, 'code', 'PHONE_TAKEN');
+  end if;
+  insert into audit_log (staff_id, action, detail) values (s.id, 'participant_edit', jsonb_build_object('ref', p.ref_code,
+    'before', jsonb_build_object('name', p.name, 'phone', p.phone, 'email', p.email, 'company', p.company),
+    'after', jsonb_build_object('name', nm, 'phone', ph, 'email', nullif(trim(coalesce(p_email,'')), ''), 'company', nullif(trim(coalesce(p_company,'')), ''))));
+  update participants set name = nm, phone = ph, email = nullif(trim(coalesce(p_email,'')), ''),
+         company = nullif(trim(coalesce(p_company,'')), '') where id = p.id;
+  return jsonb_build_object('ok', true, 'ref_code', p.ref_code, 'name', nm, 'phone', ph);
+end $$;
+
+create or replace function admin_prereg_update(p_token text, p_old_phone text, p_phone text, p_name text,
+                                               p_email text default null, p_company text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare s staff; old text := _norm_phone(p_old_phone); ph text := _norm_phone(p_phone); nm text := nullif(trim(coalesce(p_name,'')), '');
+begin
+  s := _staff_from_token(p_token, array[]::text[]);
+  if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
+  if old is null or not exists (select 1 from preregistrations where phone = old) then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  if nm is null then return jsonb_build_object('ok', false, 'code', 'NEED_NAME'); end if;
+  if ph is null then return jsonb_build_object('ok', false, 'code', 'BAD_PHONE'); end if;
+  if ph <> old and exists (select 1 from preregistrations where phone = ph) then return jsonb_build_object('ok', false, 'code', 'PHONE_TAKEN'); end if;
+  update preregistrations set phone = ph, name = nm, email = nullif(trim(coalesce(p_email,'')), ''),
+         company = nullif(trim(coalesce(p_company,'')), '') where phone = old;
+  insert into audit_log (staff_id, action, detail) values (s.id, 'prereg_edit', jsonb_build_object('old_phone', old, 'phone', ph, 'name', nm));
+  return jsonb_build_object('ok', true, 'phone', ph, 'name', nm);
+end $$;
+
+create or replace function admin_prereg_delete(p_token text, p_phone text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare s staff; ph text := _norm_phone(p_phone); n int;
+begin
+  s := _staff_from_token(p_token, array[]::text[]);
+  if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
+  if ph is null then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  delete from preregistrations where phone = ph; get diagnostics n = row_count;
+  if n = 0 then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  insert into audit_log (staff_id, action, detail) values (s.id, 'prereg_delete', jsonb_build_object('phone', ph));
+  return jsonb_build_object('ok', true);
+end $$;
+
 create or replace function admin_import_prereg(p_token text, p_rows jsonb, p_replace boolean default false) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare s staff; r jsonb; ph text; ok int := 0; bad jsonb := '[]'::jsonb; ser text;
@@ -1084,6 +1137,7 @@ grant execute on function
   admin_stats(text), admin_participants(text, text, text, int, int), admin_export(text),
   admin_import_prereg(text, jsonb, boolean), admin_stations(text), admin_station_save(text, int, text, boolean, boolean),
   admin_settings_save(text, jsonb), admin_staff_list(text), admin_staff_save(text, text, text, text, text, boolean, int), admin_prereg_list(text, text, text, int, int),
+  admin_participant_update(text, text, text, text, text, text), admin_prereg_update(text, text, text, text, text, text), admin_prereg_delete(text, text),
   admin_prizes(text), admin_prize_save(text, int, text, text, int, int, int, text, text),
   draw_eligible_count(text), final_create(text), final_state(text, int), final_next(text, int), final_claim(text, int, boolean), final_replace(text, int),
   draw_prize_next(text, int), draw_results_list(text), draw_void(text, int)

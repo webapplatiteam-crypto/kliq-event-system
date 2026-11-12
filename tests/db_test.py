@@ -100,6 +100,15 @@ check('prereg list: total/arrived counts', pl.get('ok') and pl['all'] == rpc('ad
 check('prereg list: pending filter excludes arrived', all(x['arrived_at'] is None for x in rpc('admin_prereg_list', A, None, 'pending', 200, 0)['rows']))
 check('prereg list: search by name', rpc('admin_prereg_list', A, 'Pre User 1')['total'] >= 1)
 
+# --- admin edit prereg
+check('prereg update: name+phone', rpc('admin_prereg_update', A, '0800000050', '0800000150', 'Pre Fixed 50', None, 'NewCo').get('ok'))
+check('prereg update: old phone gone, new present', rpc('admin_prereg_list', A, '0800000150')['total'] == 1 and rpc('admin_prereg_list', A, '0800000050')['total'] == 0)
+check('prereg update: phone taken', rpc('admin_prereg_update', A, '0800000150', '0800000001', 'X').get('code') == 'PHONE_TAKEN')
+check('prereg update: bad phone', rpc('admin_prereg_update', A, '0800000150', '12', 'X').get('code') == 'BAD_PHONE')
+check('prereg update: mc cannot', rpc('admin_prereg_update', MC, '0800000150', '0800000150', 'X').get('code') == 'AUTH')
+check('prereg delete', rpc('admin_prereg_delete', A, '0800000150').get('ok') and rpc('admin_prereg_list', A, '0800000150')['total'] == 0)
+check('prereg delete: not found', rpc('admin_prereg_delete', A, '0800000150').get('code') == 'NOT_FOUND')
+
 # --- registration
 check('bad phone', rpc('register_participant', 'abc', False, None, None, None, None, True).get('code') == 'BAD_PHONE')
 check('needs consent', rpc('register_participant', '0800000001', False, None, None, None, None, False).get('code') == 'NEED_CONSENT')
@@ -108,6 +117,13 @@ check('walk-in needs name', rpc('register_participant', '0899999999', True, '', 
 check('walk-in needs company', rpc('register_participant', '0899999999', True, 'สมชาย ใจดี', None, '', None, True).get('code') == 'NEED_COMPANY')
 p1 = rpc('register_participant', '+66 80-000-0001', False, None, None, None, None, True)
 check('pre-registered by phone (+66 format), random card, ticket matches card', p1.get('ok') and p1['participant']['ticket_no'] == p1['participant']['series_code'] + '-001', p1)
+ref1 = p1['participant']['ref_code']
+check('participant update: name/phone/company', rpc('admin_participant_update', A, ref1, 'สมหญิง แก้แล้ว', '0800009001', 'a@b.c', 'Co2').get('ok'))
+check('participant update: persisted', rpc('get_passport', p1['token'])['participant']['name'] == 'สมหญิง แก้แล้ว' and rpc('admin_participants', A, '0800009001')['total'] == 1)
+check('participant update: not found', rpc('admin_participant_update', A, 'PP-NOPE', 'X', '0800009001').get('code') == 'NOT_FOUND')
+check('participant update: need name', rpc('admin_participant_update', A, ref1, ' ', '0800009001').get('code') == 'NEED_NAME')
+check('participant update: souvenir role cannot', rpc('admin_participant_update', SV, ref1, 'X', '0800009001').get('code') == 'AUTH')
+check('participant update: revert', rpc('admin_participant_update', A, ref1, 'Pre User 1', '0800000001', 'p1@x.com', 'Co').get('ok'))
 again = rpc('register_participant', '0800000001', False, None, None, None, None, True)
 check('same phone returns same token', again.get('existing') and again['token'] == p1['token'], again)
 T1 = p1['token']

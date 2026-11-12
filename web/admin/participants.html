@@ -7,6 +7,15 @@
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@200;300;400;500;600&display=swap">
 <link rel="stylesheet" href="/app.css">
+<style>
+  tbody tr.editable { cursor:pointer } tbody tr.editable:hover td { background:#F7F4EE }
+  .edbtn { font-size:12px; min-height:30px; padding:0 10px; border-radius:8px }
+  .modal { position:fixed; inset:0; background:rgba(18,18,18,.55); z-index:60; display:flex; align-items:center; justify-content:center; padding:16px }
+  .modal[hidden] { display:none }
+  .modal .box { background:#fff; border-radius:18px; padding:22px; width:min(520px,100%); display:flex; flex-direction:column; gap:12px; box-shadow:0 24px 60px rgba(0,0,0,.25) }
+  .modal .lfield { flex:0 0 auto } .modal [hidden] { display:none !important }
+  .modal .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px } @media (max-width:560px) { .modal .grid2 { grid-template-columns:1fr } }
+</style>
 </head>
 <body class="light">
 <div class="layout">
@@ -45,6 +54,23 @@
       <div class="row"><button class="lbtn" id="prev">ก่อนหน้า</button><button class="lbtn" id="next">ถัดไป</button></div></div>
   </main>
 </div>
+<div class="modal" id="edit" hidden role="dialog" aria-modal="true" aria-labelledby="edTitle">
+  <form class="box" id="edForm">
+    <div><div class="sub" style="margin:0" id="edKind"></div><h2 id="edTitle" style="margin:0">แก้ไขข้อมูล</h2></div>
+    <div class="grid2">
+      <label class="lfield">ชื่อ<input class="linput" id="edFname" required autocomplete="off"></label>
+      <label class="lfield">นามสกุล<input class="linput" id="edLname" autocomplete="off"></label>
+    </div>
+    <label class="lfield">เบอร์โทร<input class="linput" id="edPhone" inputmode="tel" required autocomplete="off"></label>
+    <label class="lfield">บริษัท / ร้านค้า<input class="linput" id="edCompany" autocomplete="off"></label>
+    <label class="lfield">อีเมล (ถ้ามี)<input class="linput" id="edEmail" type="email" autocomplete="off"></label>
+    <div id="edErr" class="lnotice" hidden role="alert"></div>
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <button class="lbtn danger" type="button" id="edDel" hidden>ลบรายชื่อนี้</button>
+      <div class="row" style="margin-left:auto"><button class="lbtn" type="button" id="edCancel">ยกเลิก</button><button class="lbtn primary" type="submit" id="edSave">บันทึก</button></div>
+    </div>
+  </form>
+</div>
 <script src="/config.js"></script>
 <script src="/app.js"></script>
 <script src="/admin/admin.js"></script>
@@ -54,13 +80,15 @@
   const me = await AdminShell('participants', ['register', 'souvenir']);
   if (!me) return;
   if (me.role === 'admin') $$('.adminonly').forEach(e => { if (e.id !== 'impBox') e.hidden = false; });
+  const ADMIN = me.role === 'admin';
+  const edCell = () => ADMIN ? '<td><button class="lbtn edbtn" type="button" data-ed>แก้ไข</button></td>' : '';
   const PAGE = 50;
   let filter = 'all', offset = 0, total = 0, timer;
-  let mode = 'participants';
+  let mode = 'participants', ROWS = [];
   const FP = [['all', 'ทั้งหมด'], ['pre', 'ล่วงหน้า'], ['walkin', 'Walk-in'], ['completed', 'ครบทุกฐาน'], ['waiting', 'ครบฐาน รอของพิเศษ'], ['souvenir', 'รับของแล้ว']];
   const FR = [['all', 'ทั้งหมด'], ['pending', 'ยังไม่มา'], ['arrived', 'มาถึงแล้ว']];
   const drawFilters = () => { const F = mode === 'prereg' ? FR : FP; filter = 'all'; $('#filters').innerHTML = F.map(f => `<button class="chip" type="button" data-f="${f[0]}" aria-pressed="${f[0] === filter}">${f[1]}</button>`).join('');
-    document.querySelector('thead tr').innerHTML = mode === 'prereg' ? '<th>ชื่อ - นามสกุล</th><th>เบอร์โทร</th><th>บริษัท</th><th>อีเมล</th><th>สถานะ</th><th>รหัส / ลุ้นโชค</th><th>มาถึง</th>' : '<th>รหัส</th><th>ชื่อ - นามสกุล</th><th>เบอร์โทร</th><th>บริษัท</th><th>ประเภท</th><th>ลุ้นโชค</th><th>Passport</th><th>ของที่ระลึก</th><th>ลงทะเบียน</th>'; };
+    document.querySelector('thead tr').innerHTML = (mode === 'prereg' ? '<th>ชื่อ - นามสกุล</th><th>เบอร์โทร</th><th>บริษัท</th><th>อีเมล</th><th>สถานะ</th><th>รหัส / ลุ้นโชค</th><th>มาถึง</th>' : '<th>รหัส</th><th>ชื่อ - นามสกุล</th><th>เบอร์โทร</th><th>บริษัท</th><th>ประเภท</th><th>ลุ้นโชค</th><th>Passport</th><th>ของที่ระลึก</th><th>ลงทะเบียน</th>') + (ADMIN ? '<th></th>' : ''); };
   drawFilters();
   $('#modes').onclick = e => { const b = e.target.closest('button'); if (!b) return; mode = b.dataset.m; offset = 0; $$('#modes .chip').forEach(x => x.setAttribute('aria-pressed', x === b)); drawFilters(); load(); };
   $('#filters').onclick = e => { const b = e.target.closest('button'); if (!b) return; filter = b.dataset.f; offset = 0;
@@ -76,12 +104,13 @@
     total = r.total;
     $('#total').textContent = 'พบ ' + r.total + ' รายการ';
     $('#pageInfo').textContent = r.total ? `แสดง ${offset + 1}–${Math.min(offset + PAGE, r.total)} จาก ${r.total}` : '';
-    $('#rows').innerHTML = r.rows.length ? r.rows.map(p => `<tr>
+    ROWS = r.rows;
+    $('#rows').innerHTML = r.rows.length ? r.rows.map((p, i) => `<tr data-i="${i}" class="${ADMIN ? 'editable' : ''}">
       <td class="sub">${esc(p.ref_code)}</td><td style="font-weight:500">${esc(p.name)}</td><td>${esc(p.phone)}</td><td>${esc(p.company || '')}</td>
       <td><span class="pill ${p.source === 'pre' ? 'pre' : 'walk'}">${p.source === 'pre' ? 'ล่วงหน้า' : 'Walk-in'}</span></td>
       <td style="letter-spacing:1px">${esc(p.ticket_no)}</td><td>${p.stamps}${p.completed_at ? ' ✓' : ''}</td>
       <td>${p.souvenir_at ? '<span class="pill done">รับ' + (p.souvenir_tier === 'premium' ? 'พิเศษ' : 'ทั่วไป') + ' ' + fmtTime(p.souvenir_at) + '</span>' : ''}${p.completed_at && p.souvenir_tier !== 'premium' ? ' <span class="pill wait">รอของพิเศษ</span>' : ''}${!p.souvenir_at && !p.completed_at ? '—' : ''}</td>
-      <td class="sub">${fmtDateTime(p.created_at)}</td></tr>`).join('') : '<tr><td colspan="9" class="sub">ไม่พบรายการ</td></tr>';
+      <td class="sub">${fmtDateTime(p.created_at)}</td>${edCell()}</tr>`).join('') : '<tr><td colspan="9" class="sub">ไม่พบรายการ</td></tr>';
   }
   async function loadPrereg() {
     const r = await rpc('admin_prereg_list', { p_token: me.token, p_search: $('#q').value, p_filter: filter, p_limit: PAGE, p_offset: offset });
@@ -89,15 +118,52 @@
     total = r.total;
     $('#total').textContent = `รายชื่อล่วงหน้า ${r.all} คน · มาถึงแล้ว ${r.arrived} · ยังไม่มา ${r.all - r.arrived}` + ($('#q').value || filter !== 'all' ? ` · แสดง ${r.total}` : '');
     $('#pageInfo').textContent = r.total ? `แสดง ${offset + 1}–${Math.min(offset + PAGE, r.total)} จาก ${r.total}` : '';
-    $('#rows').innerHTML = r.rows.length ? r.rows.map(p => `<tr>
+    ROWS = r.rows;
+    $('#rows').innerHTML = r.rows.length ? r.rows.map((p, i) => `<tr data-i="${i}" class="${ADMIN ? 'editable' : ''}">
       <td style="font-weight:500">${esc(p.name)}</td><td>${esc(p.phone)}</td><td>${esc(p.company || '')}</td><td class="sub">${esc(p.email || '')}</td>
       <td>${p.arrived_at ? '<span class="pill done">มาถึงแล้ว</span>' : '<span class="pill wait">ยังไม่มา</span>'}</td>
-      <td style="letter-spacing:1px">${p.ref_code ? esc(p.ref_code) + ' · ' + esc(p.ticket_no) : '—'}</td><td class="sub">${p.arrived_at ? fmtDateTime(p.arrived_at) : ''}</td></tr>`).join('') : '<tr><td colspan="9" class="sub">ไม่พบรายการ</td></tr>';
+      <td style="letter-spacing:1px">${p.ref_code ? esc(p.ref_code) + ' · ' + esc(p.ticket_no) : '—'}</td><td class="sub">${p.arrived_at ? fmtDateTime(p.arrived_at) : ''}</td>${edCell()}</tr>`).join('') : '<tr><td colspan="9" class="sub">ไม่พบรายการ</td></tr>';
   }
   load();
   setInterval(() => { if (!document.hidden && !$('#q').value) load(); }, 20000);
 
   if (me.role !== 'admin') return;
+
+  // ---- แก้ไขชื่อ/เบอร์ (แอดมิน) ----
+  let edRow = null;
+  const ED = $('#edit');
+  function openEdit(p) {
+    edRow = p;
+    const [fn, ...ln] = String(p.name || '').trim().split(/\s+/);
+    $('#edKind').textContent = mode === 'prereg' ? 'รายชื่อลงทะเบียนล่วงหน้า' + (p.ref_code ? ' · มาถึงแล้ว ' + p.ref_code : '') : 'ผู้ร่วมงาน · ' + p.ref_code + ' · ลุ้นโชค ' + p.ticket_no;
+    $('#edFname').value = fn || ''; $('#edLname').value = ln.join(' '); $('#edPhone').value = p.phone || '';
+    $('#edCompany').value = p.company || ''; $('#edEmail').value = p.email || '';
+    $('#edErr').hidden = true; $('#edDel').hidden = mode !== 'prereg';
+    ED.hidden = false; $('#edFname').focus();
+  }
+  const closeEdit = () => { ED.hidden = true; edRow = null; };
+  $('#rows').onclick = e => { const tr = e.target.closest('tr[data-i]'); if (!tr) return; const p = ROWS[+tr.dataset.i]; if (p) openEdit(p); };
+  $('#edCancel').onclick = closeEdit;
+  ED.onclick = e => { if (e.target === ED) closeEdit(); };
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !ED.hidden) closeEdit(); });
+  $('#edForm').onsubmit = async e => {
+    e.preventDefault(); if (!edRow) return;
+    const name = ($('#edFname').value.trim() + ' ' + $('#edLname').value.trim()).trim();
+    const args = { p_token: me.token, p_name: name, p_phone: $('#edPhone').value.trim(), p_email: $('#edEmail').value.trim(), p_company: $('#edCompany').value.trim() };
+    busy($('#edSave'), true, 'กำลังบันทึก…');
+    const r = mode === 'prereg' ? await rpc('admin_prereg_update', { ...args, p_old_phone: edRow.phone })
+                                : await rpc('admin_participant_update', { ...args, p_ref_code: edRow.ref_code });
+    busy($('#edSave'), false);
+    if (!r || !r.ok) { $('#edErr').hidden = false; $('#edErr').textContent = msg(r); return; }
+    toast('บันทึกแล้ว · ' + r.name + ' ' + r.phone, 'ok'); closeEdit(); load();
+  };
+  $('#edDel').onclick = async () => {
+    if (!edRow || !confirm('ลบ "' + edRow.name + '" (' + edRow.phone + ') ออกจากรายชื่อล่วงหน้า?')) return;
+    const r = await rpc('admin_prereg_delete', { p_token: me.token, p_phone: edRow.phone });
+    if (!r || !r.ok) { $('#edErr').hidden = false; $('#edErr').textContent = msg(r); return; }
+    toast('ลบรายชื่อแล้ว', 'ok'); closeEdit(); load();
+  };
+
   $('#exp').onclick = async () => {
     busy($('#exp'), true);
     const r = await rpc('admin_export', { p_token: me.token });

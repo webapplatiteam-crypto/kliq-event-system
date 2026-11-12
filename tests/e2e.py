@@ -278,6 +278,14 @@ async def main():
         check('stations page renders 7 QR codes', await a.locator('.qrcard svg').count() == 7)
         await a.goto(BASE + '/admin/participants.html'); await a.wait_for_function("document.querySelector('#total').textContent.indexOf('พบ') >= 0")
         check('participants list shows 27', '27' in await a.inner_text('#total'), await a.inner_text('#total'))
+        # admin edits a participant's name/phone from the list
+        await a.fill('#q', 'วิชัย'); await a.wait_for_timeout(600)
+        await a.click('#rows tr[data-i] [data-ed]'); await a.wait_for_selector('#edit:not([hidden])')
+        await a.fill('#edLname', 'แก้ไขแล้ว'); await a.fill('#edPhone', '0899990099'); await a.click('#edSave')
+        await a.wait_for_selector('#edit[hidden]', state='attached'); await a.wait_for_timeout(500)
+        check('admin edit participant persisted', db("select count(*) from participants where phone='0899990099' and name like '% แก้ไขแล้ว'") == '1')
+        await shot(a, '22b_admin_edit', True)
+        await a.fill('#q', ''); await a.wait_for_timeout(600)
         async with a.expect_download() as dl:
             await a.click('#exp')
         d = await dl.value; path = await d.path(); content = open(path, encoding='utf-8-sig').read()
