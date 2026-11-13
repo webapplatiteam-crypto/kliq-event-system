@@ -36,13 +36,19 @@
   .intro .ihint { font-size:min(1.3vw, 2vh); color:var(--ink3); flex:0 0 auto }
   .intro .ibtns { display:flex; gap:12px; flex:0 0 auto }
   .stagewrap > .head h1 { font-size:min(3vw,4.2vh); line-height:1.1 } .stagewrap > .head img { height:min(26px,3vh) !important }
-  .stagebody-wheel .cards5.mini .scard img { height:5.5vh } .stagebody-wheel .cards5.mini .stamp { font-size:min(1.2vw,2.2vh) }
+  .stagebody-wheel .cards5.mini .scard { height:17vh } .stagebody-wheel .cards5.mini .stamp { font-size:min(1.3vw,2.4vh) }
   .stamp.still { animation:none; opacity:1; transform:translate(-50%,-50%) rotate(-12deg) scale(1) }
-  .cards5.mini .stamp.still { top:50% }
+  .cards5.mini .stamp.still { top:30%; left:78%; transform:translate(-50%,-50%) rotate(-12deg) scale(.8) }
   .scard .rkb { position:absolute; top:10px; left:10px; z-index:2; background:var(--gold); color:#121212; font-size:clamp(11px,.9vw,16px); font-weight:500; padding:4px 10px; border-radius:12px; letter-spacing:1px }
-  .cards5.mini { flex:0 0 auto; gap:1vw; min-height:0 } .cards5.mini .scard { padding-bottom:1.2vh; gap:.4vh; border-radius:16px } .cards5.mini .scard img { height:7vh }
-  .cards5.mini .scard .nm { font-size:min(1.3vw,2.2vh); letter-spacing:4px } .cards5.mini .scard .tg { font-size:min(.8vw,1.5vh); letter-spacing:1px }
-  .cards5.mini .scard .tg:nth-of-type(1) { display:none } .cards5.mini .stamp { font-size:clamp(14px,1.5vw,26px) }
+  /* การ์ดย่อ: รูปสินค้า (แนวนอน เห็นตัวสวิตช์) อยู่ด้านบน · แถบชื่อสีการ์ดอยู่ด้านล่าง ไม่ทับรูป */
+  .cards5.mini { flex:0 0 auto; gap:1vw; min-height:0 } .cards5.mini .scard { position:relative; height:19vh; padding:0; gap:0; border-radius:16px; display:flex; flex-direction:column }
+  .cards5.mini .scard img { width:100%; height:62%; flex:none; object-fit:cover; object-position:center }
+  .cards5.mini .scard .nm, .cards5.mini .scard .tg2 { position:static; text-align:center; padding:0 4% }
+  .cards5.mini .scard .nm { margin-top:.5vh; line-height:1.15 }
+  .cards5.mini .scard .tg2 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.85; max-width:92%; align-self:center; box-sizing:border-box }
+  .cards5.mini .scard.out img { filter:grayscale(1) brightness(.6) }
+  .cards5.mini .scard .nm { font-size:min(1.4vw,2.4vh); letter-spacing:4px; font-weight:400 } .cards5.mini .scard .tg { font-size:min(.9vw,1.7vh); letter-spacing:1px }
+  .cards5.mini .scard .tg1 { display:none } .cards5.mini .stamp { font-size:clamp(14px,1.5vw,26px) }
   .spot { border-color:var(--gold) !important; transform:scale(1.06) !important; box-shadow:0 0 70px rgba(201,160,99,.75), inset 0 0 0 2px rgba(255,255,255,.25); z-index:2 }
   .scard.spot img { filter:brightness(1.12) }
   .flash { animation:flash .35s ease-out 1 } @keyframes flash { 0% { filter:brightness(2.2) } 100% { filter:brightness(1) } }
@@ -317,8 +323,8 @@
     return `<div class="cards5 ${mini ? 'mini' : ''}">${series.map(s => `<div class="scard ${s.out ? 'out' : ''} ${s.in ? 'in' : ''} ${s.rank ? 'ranked' : ''} ${s.code === cur && !draw.done ? 'pick' : ''}" data-code="${esc(s.code)}" data-pos="${s.pos || ''}" style="background:${esc(s.color)};color:${inkFor(s.code)}">
       ${s.rank ? `<div class="rkb">รางวัลที่ ${s.rank}</div>` : s.in ? `<div class="rkb">IN · เข้ารอบ</div>` : ''}
       ${s.out ? '<div class="stamp still">OUT</div>' : s.in && !s.rank ? '<div class="stamp gold still">IN</div>' : ''}
-      <img src="${seriesImg(s.code, 'p')}" alt="สวิตช์ KLIQ ${esc(s.name)}"><div class="nm">${esc(s.name)}</div><div class="tg">${esc(s.tagline || '')}</div>
-      <div class="tg">${s.out ? 'คัดออกแล้ว' : s.rank ? esc(prizeName(s.rank)) : mini ? (s.holders != null ? s.holders + ' ท่าน' : '') : ''}</div></div>`).join('')}</div>`;
+      <img src="${seriesImg(s.code, mini ? 'l' : 'p')}" alt="สวิตช์ KLIQ ${esc(s.name)}"><div class="nm">${esc(s.name)}</div><div class="tg tg1">${esc(s.tagline || '')}</div>
+      <div class="tg tg2">${s.out ? 'คัดออกแล้ว' : s.rank ? esc(prizeName(s.rank)) : mini ? (s.holders != null ? s.holders + ' ท่าน' : '') : ''}</div></div>`).join('')}</div>`;
   }
 
   // ---------- ป๊อปอัปผู้โชคดี + นับถอยหลัง ----------
