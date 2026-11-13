@@ -933,6 +933,22 @@ begin
   return jsonb_build_object('ok', true, 'removed', n);
 end $$;
 
+-- รีเซ็ตเฉพาะลักกี้ดรอว์ (ผลจับฉลาก + รอบชิง) — เก็บผู้ร่วมงาน การ์ด แสตมป์ ไว้ทั้งหมด · แอดมินพิมพ์ยืนยัน RESET
+create or replace function admin_reset_draw(p_token text, p_confirm text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare s staff; n int;
+begin
+  s := _staff_from_token(p_token, array[]::text[]);
+  if s.id is null or s.role <> 'admin' then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
+  if coalesce(p_confirm, '') <> 'RESET' then return jsonb_build_object('ok', false, 'code', 'BAD_INPUT'); end if;
+  select count(*) into n from draw_results;
+  delete from draw_results where id is not null;
+  delete from final_draws where id is not null;
+  delete from grand_draws where id is not null;
+  insert into audit_log (staff_id, action, detail) values (s.id, 'reset_draw', jsonb_build_object('results_removed', n));
+  return jsonb_build_object('ok', true, 'removed', n);
+end $$;
+
 create or replace function draw_eligible_count(p_token text) returns jsonb
 language plpgsql stable security definer set search_path = public as $$
 declare s staff;
@@ -1229,7 +1245,7 @@ grant execute on function
   admin_import_prereg(text, jsonb, boolean), admin_stations(text), admin_station_save(text, int, text, boolean, boolean),
   admin_settings_save(text, jsonb), admin_staff_list(text), admin_staff_save(text, text, text, text, text, boolean, int), admin_prereg_list(text, text, text, int, int),
   admin_participant_update(text, text, text, text, text, text), admin_participant_delete(text, text), admin_prereg_update(text, text, text, text, text, text), admin_prereg_delete(text, text),
-  admin_prizes(text), admin_prize_save(text, int, text, text, int, int, int, text, text), admin_prize_delete(text, int), admin_reset_event(text, text),
+  admin_prizes(text), admin_prize_save(text, int, text, text, int, int, int, text, text), admin_prize_delete(text, int), admin_reset_event(text, text), admin_reset_draw(text, text),
   draw_eligible_count(text), final_create(text), final_state(text, int), final_next(text, int), final_claim(text, int, boolean), final_replace(text, int),
   draw_prize_next(text, int), draw_results_list(text), draw_void(text, int)
 to anon, authenticated;

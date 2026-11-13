@@ -45,7 +45,7 @@
       </section>
     </div>
     <section style="display:flex;flex-direction:column;gap:10px">
-      <div class="head"><h2>บันทึกผลการจับฉลาก</h2><button class="lbtn" id="expW">Export ผู้ได้รางวัล</button></div>
+      <div class="head"><h2>บันทึกผลการจับฉลาก</h2><button class="lbtn danger" id="resetDraw" title="ลบผลจับฉลากและรอบชิงทั้งหมด เก็บผู้ร่วมงานไว้">รีเซ็ตลักกี้ดรอว์</button> <button class="lbtn" id="expW">Export ผู้ได้รางวัล</button></div>
       <div class="tablebox"><table><thead><tr><th>รางวัล</th><th>หมายเลข</th><th>ชื่อ</th><th>เบอร์</th><th>ซีรีส์</th><th>เวลา</th><th>รับรางวัล</th><th></th></tr></thead><tbody id="res"></tbody></table></div>
       <div class="sub">ผู้ได้รางวัลไม่อยู่ในงาน? กด "ยกเลิกสิทธิ์" · รอบชิงกด "สุ่มแทน" เพื่อสุ่มจากผู้ถือการ์ดใบเดียวกัน · รางวัลทั่วไปสุ่มใหม่บนจอเวที</div>
     </section>
@@ -133,6 +133,12 @@
     if (!confirm('ยกเลิกสิทธิ์ผู้ได้รางวัลนี้? (เช่น ไม่อยู่ในงาน) คนนี้จะไม่ถูกสุ่มอีก')) return;
     const r = await rpc('draw_void', { p_token: me.token, p_result_id: +id });
     toast(r && r.ok ? 'ยกเลิกสิทธิ์แล้ว สุ่มใหม่บนจอเวทีได้' : msg(r), r && r.ok ? 'ok' : 'err'); load();
+  };
+  $('#resetDraw').onclick = async () => {
+    const c = prompt('รีเซ็ตเฉพาะลักกี้ดรอว์: ลบผลจับฉลากและรอบชิงทั้งหมด (ผู้ร่วมงาน/การ์ด/แสตมป์ยังอยู่)\nพิมพ์ RESET เพื่อยืนยัน');
+    if (c === null) return;
+    const r = await rpc('admin_reset_draw', { p_token: me.token, p_confirm: c.trim() });
+    toast(r && r.ok ? 'รีเซ็ตลักกี้ดรอว์แล้ว (ลบผล ' + r.removed + ' รายการ) เริ่มรอบใหม่บนจอเวทีได้' : r && r.code === 'BAD_INPUT' ? 'ต้องพิมพ์ RESET' : msg(r), r && r.ok ? 'ok' : 'err'); load();
   };
   $('#expW').onclick = () => download('kliq-winners.csv', toCSV(results.filter(x => !x.voided), [
     { key: 'prize', label: 'รางวัล' }, { key: 'ticket_no', label: 'หมายเลข' }, { key: 'name', label: 'ชื่อ' }, { key: 'phone', label: 'เบอร์' },
