@@ -927,7 +927,7 @@ begin
   delete from stamps where true;
   delete from participants where true;
   perform setval('participant_ref_seq', 1, false);
-  update series set next_no = 1;
+  update series set next_no = 1 where true;
   update settings set cutoff_at = null, registration_open = true, updated_at = now() where id = 1;
   insert into audit_log (staff_id, action, detail) values (s.id, 'reset_event', jsonb_build_object('participants_removed', n));
   return jsonb_build_object('ok', true, 'removed', n);

@@ -1,7 +1,7 @@
 """ทดสอบฟังก์ชันฐานข้อมูลทั้งหมดในบทบาท anon (เหมือนเว็บจริงเรียกผ่าน Supabase)
 ใช้: python3 db_test.py <socket_dir> <port> <db>
 """
-import json, subprocess, sys, concurrent.futures as cf
+import json, os, subprocess, sys, concurrent.futures as cf
 
 SOCK, PORT, DB = sys.argv[1], sys.argv[2], sys.argv[3]
 fails = []
@@ -362,6 +362,11 @@ rs = rpc('admin_reset_event', A, 'RESET')
 st2 = rpc('admin_stats', A)
 check('reset clears participants/results, keeps prereg + prizes', rs.get('ok') and st2['registered'] == 0 and st2['preregistered_total'] > 0 and len(rpc('admin_prizes', A)['rows']) >= 4 and rpc('draw_results_list', A)['rows'] == [] and rpc('final_state', MC)['draw'] is None, (rs, st2.get('registered')))
 check('reset: numbering restarts', rpc('register_participant', '0800000001', False, None, None, None, None, True)['participant']['ref_code'] == 'PP-0001')
+# Supabase บล็อก UPDATE/DELETE ที่ไม่มี WHERE — กันพลาดตั้งแต่ตอนเทส
+import re as _re
+_sql = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'supabase', 'schema.sql'), encoding='utf-8').read()
+_bad = [st.strip()[:80] for st in _sql.split(';') if _re.match(r'^\s*(update\s+\w+\s+set\b|delete\s+from\s+\w+)', st.strip(), _re.I) and not _re.search(r'\bwhere\b', st, _re.I)]
+check('schema: no UPDATE/DELETE without WHERE (Supabase rule)', not _bad, _bad)
 check('logout', rpc('staff_logout', SV).get('ok') and rpc('staff_me', SV).get('code') == 'AUTH')
 
 print('\nRESULT:', 'ALL PASS' if not fails else f'{len(fails)} FAILED: {fails}')
