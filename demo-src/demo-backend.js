@@ -19,6 +19,7 @@
   const tok = (n) => { let s = ''; const a = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'; for (let i = 0; i < n; i++) s += a[Math.floor(Math.random() * a.length)]; return s; };
   const pick = arr => arr[Math.floor(Math.random() * arr.length)];
   const shuffle = arr => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const nameHint = n => { const p = String(n || '').trim().split(/\s+/); return p.length >= 2 ? p[0] + ' ' + p[p.length - 1][0] + '.' : (p[0] || ''); };
   const normPhone = p => { let d = String(p || '').replace(/\D/g, ''); if (d.startsWith('66') && d.length === 11) d = '0' + d.slice(2); return /^0\d{8,9}$/.test(d) ? d : null; };
   const maskName = n => String(n || '').trim().split(/\s+/).map(w => w.length <= 2 ? w : w.slice(0, 2) + '**').join(' ');
   const maskPhone = p => p && p.length >= 9 ? p.slice(0, 3) + '-XXX-' + p.slice(-4) : p;
@@ -129,7 +130,7 @@
 
   const FN = {
     event_info: db => eventInfo(db),
-    register_participant: (db, a) => { const r = register(db, { phone: a.p_phone, walkin: a.p_walkin, name: a.p_name, email: a.p_email, company: a.p_company, consent: a.p_consent }); return r.ok ? { ok: true, existing: r.existing, token: r.token, participant: r.participant } : r; },
+    register_participant: (db, a) => { const r = register(db, { phone: a.p_phone, walkin: a.p_walkin, name: a.p_name, email: a.p_email, company: a.p_company, consent: a.p_consent }); return r.ok ? { ok: true, existing: r.existing, name_hint: r.existing ? nameHint(r.participant.name) : undefined, token: r.token, participant: r.participant } : r; },
     get_passport: (db, a) => { const p = db.participants.find(x => x.token === a.p_token); if (!p) return { ok: false, code: 'NO_PARTICIPANT' };
       const r = db.results.find(x => x.participant_id === p.id && !x.voided); const z = r && db.prizes.find(x => x.id === r.prize_id);
       return { ok: true, participant: pj(db, p), stamps: stampsJson(db, p.id), won: r ? { prize: z.name, kind: z.kind, rank: z.rank, image: z.image || null, description: z.description || null, at: r.drawn_at, check: ('DEMO' + r.id).slice(0, 6) } : null, event: eventInfo(db),

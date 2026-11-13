@@ -55,6 +55,7 @@
       <span>ยินยอมให้เก็บชื่อ เบอร์โทร และอีเมล เพื่อใช้ในกิจกรรมนี้และติดต่อผู้ได้รางวัล ตาม<a href="/privacy.html" target="_blank" rel="noopener">นโยบายความเป็นส่วนตัว</a></span></label>
 
     <div id="err" class="notice err" hidden role="alert"></div>
+    <div id="dup" class="notice" hidden role="alert" style="border-color:var(--gold)"></div>
     <button class="btn" type="submit" id="submit">สุ่มการ์ดและรับสิทธิ์
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></button>
     <p class="small muted center" style="margin:0">1 เบอร์ 1 สิทธิ์ · ลงทะเบียนซ้ำด้วยเบอร์เดิมจะกลับเข้าสิทธิ์เดิม</p>
@@ -65,7 +66,7 @@
 <script src="/app.js"></script>
 <script>
 (function () {
-  const { $, rpc, msg, busy, P } = K;
+  const { $, rpc, msg, busy, P, esc } = K;
   const next = new URLSearchParams(location.search).get('next');
   if (P.token() && !new URLSearchParams(location.search).has('new')) { location.replace(next || '/passport.html'); return; }
 
@@ -92,7 +93,21 @@
     }
   });
 
+  // เบอร์นี้มีคนลงทะเบียนแล้ว → ถามก่อนว่าใช่คนเดิมไหม กันคนใช้เบอร์ซ้ำกัน
+  function askExisting(r) {
+    const box = $('#dup'); box.hidden = false;
+    box.innerHTML = `<div style="font-size:17px;font-weight:500">เบอร์นี้ลงทะเบียนไว้แล้วในชื่อ <span style="color:var(--gold)">คุณ${esc(r.name_hint || r.participant.name)}</span></div>
+      <div class="muted" style="margin:6px 0 12px">ใช่คุณหรือไม่? ถ้าใช่ กดเข้าดู Passport ของคุณได้เลย · ถ้าไม่ใช่ กรุณาลงทะเบียนด้วยเบอร์ของคุณเอง</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn" type="button" id="dupYes">ใช่ ฉันเอง · เข้าดู Passport</button>
+        <button class="btn ghost" type="button" id="dupNo">ไม่ใช่ · ลงทะเบียนด้วยเบอร์อื่น</button></div>`;
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('#dupYes').onclick = () => { P.set(r.token); location.href = next || '/passport.html'; };
+    $('#dupNo').onclick = () => { box.hidden = true; $('#phone').value = ''; $('#phone').focus(); };
+  }
+
   $('#form').addEventListener('submit', async e => {
+    $('#dup').hidden = true;
     e.preventDefault();
     const btn = $('#submit');
     $('#err').hidden = true;
@@ -107,6 +122,7 @@
       p_company: company, p_consent: $('#consent').checked
     });
     busy(btn, false);
+    if (r && r.ok && r.existing) { askExisting(r); return; }
     if (r && r.ok) { P.set(r.token); location.href = next || '/passport.html?welcome=1'; return; }
     $('#err').hidden = false;
     $('#err').textContent = msg(r);

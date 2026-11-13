@@ -126,6 +126,7 @@ check('participant update: souvenir role cannot', rpc('admin_participant_update'
 check('participant update: revert', rpc('admin_participant_update', A, ref1, 'Pre User 1', '0800000001', 'p1@x.com', 'Co').get('ok'))
 again = rpc('register_participant', '0800000001', False, None, None, None, None, True)
 check('same phone returns same token', again.get('existing') and again['token'] == p1['token'], again)
+check('duplicate phone carries masked name hint', again.get('name_hint') == 'Pre 1.', again.get('name_hint'))
 T1 = p1['token']
 
 

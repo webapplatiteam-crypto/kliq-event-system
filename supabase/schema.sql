@@ -248,6 +248,15 @@ begin
   return s;
 end $$;
 
+-- ชื่อแบบปิดบางส่วน ใช้ถามยืนยัน "ใช่คุณ ... ไหม" ตอนกรอกเบอร์ซ้ำ (ชื่อเต็ม + นามสกุลตัวแรก)
+create or replace function _name_hint(n text) returns text
+language sql immutable as $$
+  select case when array_length(parts, 1) >= 2
+              then parts[1] || ' ' || left(parts[array_length(parts, 1)], 1) || '.'
+              else coalesce(parts[1], '') end
+    from (select regexp_split_to_array(trim(coalesce(n, '')), '\s+') as parts) x;
+$$;
+
 create or replace function _participant_json(p participants) returns jsonb
 language sql stable set search_path = public as $$
   select jsonb_build_object(
@@ -301,7 +310,7 @@ begin
   -- เบอร์เดิม = เข้าสิทธิ์เดิม
   select * into existing from participants where phone = ph;
   if existing.id is not null then
-    return jsonb_build_object('ok', true, 'existing', true, 'token', existing.token, 'participant', _participant_json(existing));
+    return jsonb_build_object('ok', true, 'existing', true, 'name_hint', _name_hint(existing.name), 'token', existing.token, 'participant', _participant_json(existing));
   end if;
 
   if not coalesce(p_consent, false) then return jsonb_build_object('ok', false, 'code', 'NEED_CONSENT'); end if;
@@ -311,7 +320,7 @@ begin
 
   select * into existing from participants where phone = ph;   -- เช็กอีกรอบหลังได้ล็อก
   if existing.id is not null then
-    return jsonb_build_object('ok', true, 'existing', true, 'token', existing.token, 'participant', _participant_json(existing));
+    return jsonb_build_object('ok', true, 'existing', true, 'name_hint', _name_hint(existing.name), 'token', existing.token, 'participant', _participant_json(existing));
   end if;
 
   select * into cfg from settings where id = 1;

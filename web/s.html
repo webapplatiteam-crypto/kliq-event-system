@@ -71,7 +71,17 @@
       busy($('#rb'), true);
       const r = await rpc('register_participant', { p_phone: $('#ph').value, p_walkin: false, p_consent: false });
       busy($('#rb'), false);
-      if (r && r.ok && r.existing) { P.set(r.token); collect(); return; }
+      if (r && r.ok && r.existing) {
+        $('#rerr').hidden = false; $('#rerr').className = 'notice'; $('#rerr').style.borderColor = 'var(--gold)';
+        $('#rerr').innerHTML = `<div style="font-weight:500">เบอร์นี้ลงทะเบียนไว้ในชื่อ <span style="color:var(--gold)">คุณ${esc(r.name_hint || r.participant.name)}</span> ใช่คุณหรือไม่?</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+            <button class="btn" type="button" id="dupYes">ใช่ ฉันเอง · รับแสตมป์</button>
+            <button class="btn ghost" type="button" id="dupNo">ไม่ใช่ · ใช้เบอร์อื่น</button></div>`;
+        $('#dupYes').onclick = () => { P.set(r.token); collect(); };
+        $('#dupNo').onclick = () => { $('#rerr').hidden = true; $('#rerr').className = 'notice err'; $('#rerr').style.borderColor = ''; $('#ph').value = ''; $('#ph').focus(); };
+        return;
+      }
+      $('#rerr').className = 'notice err'; $('#rerr').style.borderColor = '';
       $('#rerr').hidden = false;
       $('#rerr').innerHTML = r && (r.code === 'NOT_PREREGISTERED' || r.code === 'NEED_CONSENT')
         ? 'ยังไม่พบการลงทะเบียนด้วยเบอร์นี้ <a href="/index.html?next=' + encodeURIComponent('/s.html?t=' + st) + '">ลงทะเบียนที่นี่</a>'
