@@ -124,6 +124,14 @@ check('participant update: not found', rpc('admin_participant_update', A, 'PP-NO
 check('participant update: need name', rpc('admin_participant_update', A, ref1, ' ', '0800009001').get('code') == 'NEED_NAME')
 check('participant update: souvenir role cannot', rpc('admin_participant_update', SV, ref1, 'X', '0800009001').get('code') == 'AUTH')
 check('participant update: revert', rpc('admin_participant_update', A, ref1, 'Pre User 1', '0800000001', 'p1@x.com', 'Co').get('ok'))
+# admin delete participant
+pdel = rpc('register_participant', '0800007777', True, 'ลบ ทดสอบ', None, 'Co', None, True)
+check('participant delete: souvenir role cannot', rpc('admin_participant_delete', SV, pdel['participant']['ref_code']).get('code') == 'AUTH')
+check('participant delete ok', rpc('admin_participant_delete', A, pdel['participant']['ref_code']).get('ok') and rpc('admin_participants', A, '0800007777')['total'] == 0)
+check('participant delete: not found after', rpc('admin_participant_delete', A, pdel['participant']['ref_code']).get('code') == 'NOT_FOUND')
+pdel2 = rpc('register_participant', '0800007777', True, 'ลบ ทดสอบ', None, 'Co', None, True)
+check('deleted phone can register again (fresh card)', pdel2.get('ok') and not pdel2.get('existing'), pdel2)
+rpc('admin_participant_delete', A, pdel2['participant']['ref_code'])
 again = rpc('register_participant', '0800000001', False, None, None, None, None, True)
 check('same phone returns same token', again.get('existing') and again['token'] == p1['token'], again)
 check('duplicate phone carries masked name hint', again.get('name_hint') == 'Pre 1.', again.get('name_hint'))
@@ -336,6 +344,7 @@ check('handover: non-winner', rpc('prize_handover', SV, p1['participant']['ref_c
 check('winner passport shows received', rpc('get_passport', wt)['won']['received_at'] is not None)
 check('results list shows received_by', any(x['received_at'] and x['received_by'] == 'STAFF01' for x in rpc('draw_results_list', A)['rows']))
 check('export has prize_received_at', any(x.get('prize_received_at') for x in rpc('admin_export', A)['rows']))
+check('winner cannot be deleted while holding prize', rpc('admin_participant_delete', A, wref).get('code') == 'HAS_PRIZE')
 # cutoff blocks registration and late registrants not eligible
 rpc('admin_settings_save', A, {'cutoff_at': '2000-01-01T00:00:00Z'})
 check('registration closed after cutoff', rpc('register_participant', '0822222222', True, 'X', None, 'Co', None, True).get('code') == 'CLOSED')

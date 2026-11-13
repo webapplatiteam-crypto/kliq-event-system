@@ -681,6 +681,25 @@ begin
   return jsonb_build_object('ok', true, 'ref_code', p.ref_code, 'name', nm, 'phone', ph);
 end $$;
 
+-- ลบผู้ร่วมงาน (แอดมินเท่านั้น) — ลบแสตมป์และผลจับฉลากที่ถูกยกเลิกไปด้วย · ถ้ายังถือรางวัลอยู่ต้องยกเลิกสิทธิ์ก่อน
+create or replace function admin_participant_delete(p_token text, p_ref_code text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare s staff; p participants;
+begin
+  s := _staff_from_token(p_token, array[]::text[]);
+  if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
+  select * into p from participants where ref_code = upper(trim(coalesce(p_ref_code,'')));
+  if p.id is null then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  if exists (select 1 from draw_results where participant_id = p.id and not voided) then return jsonb_build_object('ok', false, 'code', 'HAS_PRIZE'); end if;
+  if exists (select 1 from final_draws where pending_participant = p.id and not done) then return jsonb_build_object('ok', false, 'code', 'HAS_PRIZE'); end if;
+  insert into audit_log (staff_id, action, detail) values (s.id, 'participant_delete', jsonb_build_object('ref', p.ref_code, 'name', p.name, 'phone', p.phone, 'ticket', p.ticket_no));
+  update final_draws set pending_participant = null where pending_participant = p.id;
+  delete from draw_results where participant_id = p.id;
+  delete from stamps where participant_id = p.id;
+  delete from participants where id = p.id;
+  return jsonb_build_object('ok', true);
+end $$;
+
 create or replace function admin_prereg_update(p_token text, p_old_phone text, p_phone text, p_name text,
                                                p_email text default null, p_company text default null) returns jsonb
 language plpgsql security definer set search_path = public as $$
@@ -1172,7 +1191,7 @@ grant execute on function
   admin_stats(text), admin_participants(text, text, text, int, int), admin_export(text),
   admin_import_prereg(text, jsonb, boolean), admin_stations(text), admin_station_save(text, int, text, boolean, boolean),
   admin_settings_save(text, jsonb), admin_staff_list(text), admin_staff_save(text, text, text, text, text, boolean, int), admin_prereg_list(text, text, text, int, int),
-  admin_participant_update(text, text, text, text, text, text), admin_prereg_update(text, text, text, text, text, text), admin_prereg_delete(text, text),
+  admin_participant_update(text, text, text, text, text, text), admin_participant_delete(text, text), admin_prereg_update(text, text, text, text, text, text), admin_prereg_delete(text, text),
   admin_prizes(text), admin_prize_save(text, int, text, text, int, int, int, text, text),
   draw_eligible_count(text), final_create(text), final_state(text, int), final_next(text, int), final_claim(text, int, boolean), final_replace(text, int),
   draw_prize_next(text, int), draw_results_list(text), draw_void(text, int)

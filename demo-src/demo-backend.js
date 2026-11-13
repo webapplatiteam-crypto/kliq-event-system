@@ -192,6 +192,9 @@
       const nm = String(a.p_name || '').trim(), ph = normPhone(a.p_phone); if (!nm) return { ok: false, code: 'NEED_NAME' }; if (!ph) return { ok: false, code: 'BAD_PHONE' };
       if (ph !== p.phone && db.participants.some(x => x.phone === ph && x.id !== p.id)) return { ok: false, code: 'PHONE_TAKEN' };
       Object.assign(p, { name: nm, phone: ph, email: String(a.p_email || '').trim() || null, company: String(a.p_company || '').trim() || null }); return { ok: true, ref_code: p.ref_code, name: nm, phone: ph }; },
+    admin_participant_delete: (db, a) => { const s = staffFrom(db, a.p_token, []); if (!s) return AUTH; const i = db.participants.findIndex(x => x.ref_code === String(a.p_ref_code || '').trim().toUpperCase()); if (i < 0) return { ok: false, code: 'NOT_FOUND' }; const p = db.participants[i];
+      if (db.results.some(x => x.participant_id === p.id && !x.voided) || db.finals.some(g => g.pending_participant === p.id && !g.done)) return { ok: false, code: 'HAS_PRIZE' };
+      db.finals.forEach(g => { if (g.pending_participant === p.id) g.pending_participant = null; }); db.results = db.results.filter(x => x.participant_id !== p.id); db.stamps = db.stamps.filter(x => x.participant_id !== p.id); db.participants.splice(i, 1); return { ok: true }; },
     admin_prereg_update: (db, a) => { const s = staffFrom(db, a.p_token, []); if (!s) return AUTH; const old = normPhone(a.p_old_phone), r = old && db.prereg.find(x => x.phone === old); if (!r) return { ok: false, code: 'NOT_FOUND' };
       const nm = String(a.p_name || '').trim(), ph = normPhone(a.p_phone); if (!nm) return { ok: false, code: 'NEED_NAME' }; if (!ph) return { ok: false, code: 'BAD_PHONE' };
       if (ph !== old && db.prereg.some(x => x.phone === ph)) return { ok: false, code: 'PHONE_TAKEN' };

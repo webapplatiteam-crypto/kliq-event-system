@@ -310,6 +310,13 @@ async def main():
         await a.wait_for_selector('#edit[hidden]', state='attached'); await a.wait_for_timeout(500)
         check('admin edit participant persisted', db("select count(*) from participants where phone='0899990099' and name like '% แก้ไขแล้ว'") == '1')
         await shot(a, '22b_admin_edit', True)
+        # admin deletes a participant from the modal (dialogs auto-accepted)
+        db("set role anon; select register_participant('0899990055', true, 'ลบ ทิ้ง', null, 'Co', 'U', true)")
+        await a.fill('#q', '0899990055'); await a.wait_for_timeout(700)
+        await a.click('#rows tr[data-i] [data-ed]'); await a.wait_for_selector('#edit:not([hidden])')
+        check('delete button shown for participant', 'ลบผู้ร่วมงาน' in await a.inner_text('#edDel'))
+        await a.click('#edDel'); await a.wait_for_timeout(900)
+        check('admin delete participant removed from DB', db("select count(*) from participants where phone='0899990055'") == '0')
         await a.fill('#q', ''); await a.wait_for_timeout(600)
         async with a.expect_download() as dl:
             await a.click('#exp')

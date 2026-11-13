@@ -138,7 +138,7 @@
     $('#edKind').textContent = mode === 'prereg' ? 'รายชื่อลงทะเบียนล่วงหน้า' + (p.ref_code ? ' · มาถึงแล้ว ' + p.ref_code : '') : 'ผู้ร่วมงาน · ' + p.ref_code + ' · ลุ้นโชค ' + p.ticket_no;
     $('#edFname').value = fn || ''; $('#edLname').value = ln.join(' '); $('#edPhone').value = p.phone || '';
     $('#edCompany').value = p.company || ''; $('#edEmail').value = p.email || '';
-    $('#edErr').hidden = true; $('#edDel').hidden = mode !== 'prereg';
+    $('#edErr').hidden = true; $('#edDel').hidden = false; $('#edDel').textContent = mode === 'prereg' ? 'ลบรายชื่อนี้' : 'ลบผู้ร่วมงานนี้';
     ED.hidden = false; $('#edFname').focus();
   }
   const closeEdit = () => { ED.hidden = true; edRow = null; };
@@ -158,8 +158,12 @@
     toast('บันทึกแล้ว · ' + r.name + ' ' + r.phone, 'ok'); closeEdit(); load();
   };
   $('#edDel').onclick = async () => {
-    if (!edRow || !confirm('ลบ "' + edRow.name + '" (' + edRow.phone + ') ออกจากรายชื่อล่วงหน้า?')) return;
-    const r = await rpc('admin_prereg_delete', { p_token: me.token, p_phone: edRow.phone });
+    if (!edRow) return;
+    const q = mode === 'prereg' ? 'ลบ "' + edRow.name + '" (' + edRow.phone + ') ออกจากรายชื่อล่วงหน้า?'
+                                : 'ลบผู้ร่วมงาน "' + edRow.name + '" (' + edRow.ref_code + ' · ' + edRow.ticket_no + ') ออกจากระบบ?\nการ์ด แสตมป์ และสิทธิ์ลุ้นรางวัลของคนนี้จะหายไป กู้คืนไม่ได้';
+    if (!confirm(q)) return;
+    const r = mode === 'prereg' ? await rpc('admin_prereg_delete', { p_token: me.token, p_phone: edRow.phone })
+                                : await rpc('admin_participant_delete', { p_token: me.token, p_ref_code: edRow.ref_code });
     if (!r || !r.ok) { $('#edErr').hidden = false; $('#edErr').textContent = msg(r); return; }
     toast('ลบรายชื่อแล้ว', 'ok'); closeEdit(); load();
   };
