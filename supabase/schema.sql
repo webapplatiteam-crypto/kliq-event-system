@@ -344,13 +344,14 @@ begin
     v_name := pre.name; v_email := pre.email; v_company := pre.company; v_series := pre.series_code;
   end if;
 
-  -- สุ่มการ์ด (ซีรีส์) ให้ จากซีรีส์ที่ยังไม่เต็มโควตา
+  -- สุ่มการ์ด (ซีรีส์) ให้ แบบเกลี่ย: เลือกจากซีรีส์ที่มีคนถือน้อยที่สุด (เท่ากันค่อยสุ่ม) เฉพาะที่ยังไม่เต็มโควตา
+  -- → ทุกการ์ดมีคนถือต่างกันไม่เกิน 1 คนเสมอ · คนที่ได้การ์ดไปแล้วไม่ถูกเปลี่ยน
   v_series := null;
   select s.code into v_series from series s
     left join participants p on p.series_code = s.code
    group by s.code
   having count(p.id) < cfg.series_quota
-   order by random() limit 1;
+   order by count(p.id), random() limit 1;
   if v_series is null then return jsonb_build_object('ok', false, 'code', 'FULL'); end if;
 
   update series set next_no = next_no + 1 where code = v_series returning next_no - 1 into seq_no;

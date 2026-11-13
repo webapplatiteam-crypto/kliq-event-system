@@ -147,6 +147,8 @@ with cf.ThreadPoolExecutor(max_workers=24) as ex:
     res = list(ex.map(reg, range(1, 400)))
 oks = [r for r in res if isinstance(r, dict) and r.get('ok')]
 check('400 total registrations succeed concurrently', len(oks) == 399, [r for r in res if not (isinstance(r, dict) and r.get('ok'))][:3])
+_cnt = [int(x) for x in sql("select string_agg(c::text, ',') from (select count(*) c from participants group by series_code) t", role=None).split(',')]
+check('balanced card assignment (every series 80 after 400)', _cnt == [80] * 5, _cnt)
 cnt = sql('select count(*) from participants', role=None)
 check('participant count = 400', str(cnt) == '400', cnt)
 dup = sql('select count(*) - count(distinct ticket_no) from participants', role=None)

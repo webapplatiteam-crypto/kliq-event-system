@@ -85,7 +85,8 @@
     else { const pre = db.prereg.find(x => x.phone === ph); if (!pre) return { ok: false, code: 'NOT_PREREGISTERED' }; name = pre.name; email = pre.email; company = pre.company; }
     const open = db.series.filter(s => db.participants.filter(p => p.series_code === s.code).length < cfg.series_quota);
     if (!open.length) return { ok: false, code: 'FULL' };
-    const se = pick(open); const no = se.next_no++;
+    const cnt = c => db.participants.filter(p => p.series_code === c).length, mn = Math.min(...open.map(s => cnt(s.code)));
+    const se = pick(open.filter(s => cnt(s.code) === mn)); const no = se.next_no++;   // เกลี่ย: เลือกจากซีรีส์ที่มีคนน้อยสุด
     const p = { id: uid(), ref_code: 'PP-' + pad(db.refSeq++, 4), token: tok(24), phone: ph, name, email, company, series_code: se.code,
       ticket_no: se.code + '-' + pad(no, 3), source: a.walkin ? 'walkin' : 'pre', created_at: a.created_at || now(), completed_at: null, souvenir_at: null, souvenir_by: null, souvenir_tier: null, souvenir_upgraded_at: null };
     db.participants.push(p);
