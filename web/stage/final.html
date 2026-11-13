@@ -23,16 +23,17 @@
   .scard.pick { border-color:var(--gold); box-shadow:0 0 60px rgba(201,160,99,.55) }
   .scard.ranked:not(.pick) { opacity:.55 }
   .scard.in { border-color:var(--gold) }
-  .intro { position:fixed; inset:0; z-index:40; background:radial-gradient(ellipse at 50% 0%, #2A2620 0%, #0A0A0A 70%); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2.2vh; text-align:center; padding:4vh 6vw }
+  .intro { position:fixed; inset:0; z-index:40; background:radial-gradient(ellipse at 50% 0%, #2A2620 0%, #0A0A0A 70%); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.6vh; text-align:center; padding:2.5vh 6vw; overflow:hidden }
   .intro[hidden] { display:none }
-  .intro .ilogo { width:min(22vw, 300px); height:auto }
-  .intro .ihead { font-size:clamp(28px, 4vw, 64px); font-weight:500; line-height:1.15 }
-  .intro .isub { font-size:clamp(16px, 1.6vw, 28px); color:var(--ink2); max-width:1100px }
-  .intro .iqr { background:#fff; padding:2vh; border-radius:28px; box-shadow:0 0 0 6px var(--gold), 0 30px 80px rgba(0,0,0,.6) }
-  .intro .iqr svg { width:min(44vh, 40vw); height:min(44vh, 40vw); display:block }
-  .intro .iurl { font-size:clamp(18px, 2vw, 34px); letter-spacing:2px; color:var(--gold) }
-  .intro .ihint { font-size:clamp(14px, 1.3vw, 22px); color:var(--ink3) }
-  .intro .ibtns { display:flex; gap:12px }
+  .intro .ilogo { height:min(9vh, 90px); width:auto; flex:0 0 auto }
+  .intro .ihead { font-size:min(4vw, 5.5vh); font-weight:500; line-height:1.15; flex:0 0 auto }
+  .intro .isub { font-size:min(1.6vw, 2.4vh); color:var(--ink2); max-width:1100px; flex:0 0 auto }
+  /* QR เป็นส่วนเดียวที่ยืด/หดตามความสูงจอ → ไม่ล้นไม่ว่าจอสัดส่วนไหน */
+  .intro .iqr { background:#fff; padding:1.6vh; border-radius:24px; box-shadow:0 0 0 6px var(--gold), 0 30px 80px rgba(0,0,0,.6); flex:1 1 auto; min-height:0; aspect-ratio:1; display:flex; max-width:min(40vw, 70vh) }
+  .intro .iqr svg { height:100%; width:100%; display:block }
+  .intro .iurl { font-size:min(2vw, 3vh); letter-spacing:2px; color:var(--gold); flex:0 0 auto }
+  .intro .ihint { font-size:min(1.3vw, 2vh); color:var(--ink3); flex:0 0 auto }
+  .intro .ibtns { display:flex; gap:12px; flex:0 0 auto }
   .stamp.still { animation:none; opacity:1; transform:translate(-50%,-50%) rotate(-12deg) scale(1) }
   .cards5.mini .stamp.still { top:50% }
   .scard .rkb { position:absolute; top:10px; left:10px; z-index:2; background:var(--gold); color:#121212; font-size:clamp(11px,.9vw,16px); font-weight:500; padding:4px 10px; border-radius:12px; letter-spacing:1px }
