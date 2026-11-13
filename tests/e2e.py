@@ -334,7 +334,7 @@ async def main():
         rid = db("select r.id from draw_results r join prizes z on z.id = r.prize_id where z.kind = 'final' and z.rank = 1")
         await a.click(f'[data-void="{rid}"]'); await a.wait_for_selector('[data-replace="1"]')
         check('void from admin', db("select count(*) from draw_results where voided and void_reason = 'admin'") == '1')
-        left = int(db("select count(*) from participants p where p.series_code = (select series_order[5] from final_draws order by id desc limit 1) and not exists (select 1 from draw_results r where r.participant_id = p.id)"))
+        left = int(db("select count(*) from participants p where p.series_code = (select rank_cards[3] from final_draws order by id desc limit 1) and not exists (select 1 from draw_results r where r.participant_id = p.id)"))
         await a.click('[data-replace="1"]'); await a.wait_for_timeout(900)
         got = db("select count(*) from draw_results r join prizes z on z.id=r.prize_id where z.rank=1 and not r.voided")
         check('replace rank 1 from same card (or none left)', got == ('1' if left > 0 else '0'), (left, got))
