@@ -322,10 +322,10 @@
           <div class="nm">${esc(pd.name)}</div>
           <div style="color:var(--ink2);font-size:min(1.3vw,2.4vh)">กรุณาขึ้นมาบนเวทีภายในเวลา</div>
           <div class="ring" id="ring"><svg viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="54"/><circle class="fg" id="ringfg" cx="60" cy="60" r="54" stroke-dasharray="${C}" stroke-dashoffset="0"/></svg><b id="cd">${total}</b></div>
-          <div class="mbtns"><button class="stagebtn" id="yes">✓ อยู่ในงาน · มอบรางวัล</button><button class="stagebtn no" id="no">✗ ไม่อยู่ · หมุนใหม่</button></div>
+          <div class="mbtns"><button class="stagebtn" id="yes">✓ อยู่ในงาน · มอบรางวัล (Space)</button><button class="stagebtn no" id="no">✗ ไม่อยู่ · หมุนใหม่</button></div>
         </div>
       </div>
-      <div class="hint">Enter = อยู่ในงาน · N = ไม่อยู่ หมุนใหม่ · ถ้าไม่อยู่ สิทธิ์ของท่านนี้จะถูกตัดและสุ่มใหม่จากผู้ถือการ์ด ${esc(winName)}</div>
+      <div class="hint">Space/Enter = อยู่ในงาน · N = ไม่อยู่ หมุนใหม่ · ถ้าไม่อยู่ สิทธิ์ของท่านนี้จะถูกตัดและสุ่มใหม่จากผู้ถือการ์ด ${esc(winName)}</div>
     </div></div>`;
     const upd = () => { const leftS = Math.max(0, Math.ceil(total - (Date.now() - startAt) / 1000)); const cd = $('#cd'); if (!cd) return; cd.textContent = leftS;
       $('#ringfg').style.strokeDashoffset = C * (1 - leftS / total);
@@ -337,6 +337,7 @@
   // ย่อ/ขยายวงล้อให้พอดีกับพื้นที่ที่เหลือ ไม่ให้หน้าเลื่อน
   function fitWheel() { const w = document.querySelector('.wheelwrap'), b = $('#wheelbox'); if (!w || !b || b.closest('.spinstage')) return; const s = Math.max(240, Math.min(w.clientHeight - 6, innerWidth * .5, innerHeight * .72)); b.style.width = b.style.height = s + 'px'; }
   addEventListener('resize', fitWheel);
+  document.addEventListener('click', e => { if (e.target.closest('.gonext') && modalNext) { const f = modalNext; modalNext = null; f(); } });
   function closeModal() { clearInterval(timer); $('#modal').hidden = true; $('#modal').innerHTML = ''; }
   function clearSpinStage() { document.querySelectorAll('.spinstage').forEach(e => e.remove()); }
 
@@ -351,12 +352,16 @@
     if (present) {
       box.querySelector('.eyebrow').textContent = 'CONGRATULATIONS'; box.querySelector('.pz').textContent = `ยินดีด้วย! รับ ${pd.prize || prizeName(pd.rank)}`;
       if (pd.rank === 1) { fanfare(); whiteout(); confetti(420, true); setTimeout(() => confetti(300, true), 700); setTimeout(() => confetti(300, true), 1600); } else { sting(); confetti(220, true); setTimeout(() => confetti(120, true), 500); }
-      await sleep(pd.rank === 1 ? 5200 : 3200);
+      await sleep(pd.rank === 1 ? 2600 : 1600);
     } else {
-      box.querySelector('.eyebrow').textContent = 'NO SHOW'; box.querySelector('.pz').textContent = 'ไม่อยู่ในงาน · ตัดสิทธิ์ แล้วหมุนใหม่'; thud(); await sleep(1600);
+      box.querySelector('.eyebrow').textContent = 'NO SHOW'; box.querySelector('.pz').textContent = 'ไม่อยู่ในงาน · ตัดสิทธิ์ แล้วหมุนใหม่'; thud(); await sleep(900);
     }
-    closeModal(); draw = r.draw; prizes = r.prizes || prizes; working = false; render();
+    // ค้างหน้านี้ไว้จนกว่าพิธีกรจะกด Space (ไม่ไปต่อเอง)
+    const mr = box.querySelector('.mright'); if (mr) mr.insertAdjacentHTML('beforeend', '<div class="gonext stagebtn pulse" style="margin-top:1.5vh">ไปต่อ (Space)</div>');
+    working = false; await new Promise(res => { modalNext = res; });
+    closeModal(); draw = r.draw; prizes = r.prizes || prizes; render();
   }
+  let modalNext = null;
 
   // ---------- ขั้นตอนหลัก (ปุ่ม / Space) ----------
   let load = async function () {
@@ -434,7 +439,10 @@
     const modalOpen = !$('#modal').hidden;
     if (Intro.open()) { if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); if (!e.repeat) Intro.hide(); } return; }
     if (e.key === 'q' || e.key === 'Q') { if (!working) Intro.show(); return; }
-    if (modalOpen) { if (e.key === 'Enter') { e.preventDefault(); claim(true); } if (e.key === 'n' || e.key === 'N') claim(false); return; }
+    if (modalOpen) {
+      if (modalNext) { if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); if (e.repeat) return; const f = modalNext; modalNext = null; f(); } return; }   // หน้าผลลัพธ์: Space = ไปต่อ
+      if (e.key === 'Enter' || e.code === 'Space') { e.preventDefault(); if (!e.repeat) claim(true); }   // Space/Enter = อยู่ในงาน มอบรางวัล
+      if (e.key === 'n' || e.key === 'N') claim(false); return; }
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
     if (e.code === 'Space' && !typing) { e.preventDefault(); if (e.repeat) return; if (!releaseHold()) step(); return; }   // Space ใช้ได้ทุกที่ ไม่เลื่อนหน้า
     if (e.key === 'Enter' && !typing && releaseHold()) { e.preventDefault(); return; }
