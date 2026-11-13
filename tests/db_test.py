@@ -241,14 +241,14 @@ xid = [p for p in rpc('admin_prizes', MC)['rows'] if p['name'] == 'X'][0]['id']
 sql(f"delete from prizes where id = {xid}", role=None)
 check('normal prize added', rpc('admin_prize_save', A, None, 'ลำโพง', 'normal', 2, 5, None).get('ok'))
 IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
-check('prize image + description saved', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro Max', 'final', 1, 0, 1, '256GB สี Deep Blue', IMG).get('ok'))
-check('bad image rejected', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro Max', 'final', 1, 0, 1, None, 'http://x/y.png').get('code') == 'BAD_IMAGE')
+check('prize image + description saved', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro', 'final', 1, 0, 1, '256GB สี Deep Blue', IMG).get('ok'))
+check('bad image rejected', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro', 'final', 1, 0, 1, None, 'http://x/y.png').get('code') == 'BAD_IMAGE')
 z1 = [p for p in rpc('admin_prizes', MC)['rows'] if p['rank'] == 1][0]
 check('admin_prizes returns image/description', z1['image'] == IMG and z1['description'] == '256GB สี Deep Blue', z1)
-check('name-only save keeps image', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro Max', 'final', 1, 0, 1).get('ok') and [p for p in rpc('admin_prizes', MC)['rows'] if p['rank'] == 1][0]['image'] == IMG)
+check('name-only save keeps image', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro', 'final', 1, 0, 1).get('ok') and [p for p in rpc('admin_prizes', MC)['rows'] if p['rank'] == 1][0]['image'] == IMG)
 check('passport shows grand prize with image', rpc('get_passport', T1)['grand']['image'] == IMG)
-check('image removed with empty string', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro Max', 'final', 1, 0, 1, None, '').get('ok') and [p for p in rpc('admin_prizes', MC)['rows'] if p['rank'] == 1][0]['image'] is None)
-check('re-add image for stage test', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro Max', 'final', 1, 0, 1, None, IMG).get('ok'))
+check('image removed with empty string', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro', 'final', 1, 0, 1, None, '').get('ok') and [p for p in rpc('admin_prizes', MC)['rows'] if p['rank'] == 1][0]['image'] is None)
+check('re-add image for stage test', rpc('admin_prize_save', A, finals[1]['id'], 'iPhone 18 Pro', 'final', 1, 0, 1, None, IMG).get('ok'))
 normal = [p for p in rpc('admin_prizes', MC)['rows'] if p['kind'] == 'normal'][0]['id']
 st0 = rpc('final_state', MC)
 check('no final draw yet', st0.get('ok') and st0['draw'] is None and len(st0['prizes']) == 4 and st0['claim_sec'] == 30, st0)
@@ -313,7 +313,7 @@ res = rpc('draw_results_list', A)['rows']
 check('4 live final results with ranks 1,2,3,3', sorted(x['rank'] for x in res if x['kind'] == 'final' and not x['voided']) == [1, 2, 3, 3], res)
 check('no-show recorded as voided result', any(x['kind'] == 'final' and x['voided'] and x['ticket_no'] == first for x in res), res)
 r1 = [x for x in res if x['rank'] == 1 and not x['voided']][0]
-check('rank 1 prize is iPhone 18 Pro Max', r1['prize'] == 'iPhone 18 Pro Max')
+check('rank 1 prize is iPhone 18 Pro', r1['prize'] == 'iPhone 18 Pro')
 check('replace blocked while winner valid', rpc('final_replace', MC, 1).get('code') == 'PRIZE_DONE')
 check('void rank 1', rpc('draw_void', A, r1['id']).get('ok'))
 f = rpc('final_state', MC)['draw']
@@ -331,14 +331,14 @@ check('6 live winners, all different people', len(live) == 6 and len({x['ticket_
 check('final re-closed after replacement', rpc('final_state', MC)['draw']['next_rank'] is None)
 wt = sql(f"select token from participants where ticket_no = '{rp['ticket_no']}'", role=None)
 wp = rpc('get_passport', wt)
-check('replacement winner sees iPhone on passport', wp.get('won') and wp['won']['prize'] == 'iPhone 18 Pro Max', wp.get('won'))
+check('replacement winner sees iPhone on passport', wp.get('won') and wp['won']['prize'] == 'iPhone 18 Pro', wp.get('won'))
 # prize handover at the pickup point (souvenir staff scans winner QR)
 wref = wp['participant']['ref_code']
 lk = rpc('souvenir_lookup', SV, 'KLIQ:' + wref)
-check('pickup lookup shows prize not yet received', lk.get('prize') and lk['prize']['name'] == 'iPhone 18 Pro Max' and lk['prize']['received_at'] is None, lk.get('prize'))
+check('pickup lookup shows prize not yet received', lk.get('prize') and lk['prize']['name'] == 'iPhone 18 Pro' and lk['prize']['received_at'] is None, lk.get('prize'))
 check('handover: mc cannot', rpc('prize_handover', MC, wref).get('code') == 'AUTH')
 hv = rpc('prize_handover', SV, wref)
-check('handover ok', hv.get('ok') and hv['prize'] == 'iPhone 18 Pro Max', hv)
+check('handover ok', hv.get('ok') and hv['prize'] == 'iPhone 18 Pro', hv)
 check('handover twice blocked', rpc('prize_handover', SV, wref).get('code') == 'PRIZE_RECEIVED')
 check('handover: non-winner', rpc('prize_handover', SV, p1['participant']['ref_code']).get('code') == 'NO_PRIZE')
 check('winner passport shows received', rpc('get_passport', wt)['won']['received_at'] is not None)

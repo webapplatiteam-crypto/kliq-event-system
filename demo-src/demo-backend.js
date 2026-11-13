@@ -42,7 +42,7 @@
       { id: 's5', code: 'ST01', display_name: 'พี่บี ประจำฐาน 1', role: 'station', station_id: 1, pin: '123456', active: true, failed: 0, locked_until: null }
     ];
     db.prizes = [
-      { id: 1, name: 'iPhone 18 Pro Max', kind: 'final', rank: 1, quantity: 1, sort: 1 },
+      { id: 1, name: 'iPhone 18 Pro', kind: 'final', rank: 1, quantity: 1, sort: 1 },
       { id: 2, name: 'iPad Gen 11', kind: 'final', rank: 2, quantity: 1, sort: 2 },
       { id: 3, name: 'หูฟังอินเอียร์ Beyerdynamic', kind: 'final', rank: 3, quantity: 1, sort: 3 },
       { id: 4, name: 'หูฟังไร้สาย KEF Mu7', kind: 'final', rank: 3, quantity: 1, sort: 4 }

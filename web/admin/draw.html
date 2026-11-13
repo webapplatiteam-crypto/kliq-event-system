@@ -75,7 +75,7 @@
       <div class="pimg" style="width:120px;height:120px;border-radius:12px;background:#fff url('${z && z.image ? z.image : ''}') center/cover no-repeat;border:1px dashed #C9A063;display:flex;align-items:center;justify-content:center;font-size:12px;color:#8A7A5A;text-align:center;flex:none;cursor:pointer" title="คลิกเพื่อเลือกรูป">${z && z.image ? '' : 'คลิกเพิ่มรูป<br>ของรางวัล'}</div>
       <input type="file" accept="image/*" data-k="file" hidden>
       <div style="flex:1 1 320px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
-        <label class="lfield" style="flex:2 1 180px">ชื่อรางวัล${slotNote ? ' <span class="sub">(' + slotNote + ')</span>' : ''}<input class="linput" data-k="name" value="${esc(z ? z.name : '')}" placeholder="เช่น iPhone 18 Pro Max"></label>
+        <label class="lfield" style="flex:2 1 180px">ชื่อรางวัล${slotNote ? ' <span class="sub">(' + slotNote + ')</span>' : ''}<input class="linput" data-k="name" value="${esc(z ? z.name : '')}" placeholder="เช่น iPhone 18 Pro"></label>
         <input type="hidden" data-k="kind" value="final">
         <label class="lfield" style="flex:0 1 110px">อันดับ (รอบชิง)<select class="linput" data-k="rank"><option value="">–</option>
           ${[1, 2, 3].map(r => `<option value="${r}" ${(z ? z.rank : slotRank) === r ? 'selected' : ''}>ที่ ${r}</option>`).join('')}</select></label>
