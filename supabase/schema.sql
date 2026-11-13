@@ -144,6 +144,9 @@ create table if not exists draw_results (
   void_reason    text
 );
 alter table draw_results add column if not exists void_reason text;
+-- มอบรางวัลที่จุดรับรางวัลแล้ว (สแกน QR ผู้ชนะ) — ไว้ตรวจสอบหลังงาน
+alter table draw_results add column if not exists received_at timestamptz;
+alter table draw_results add column if not exists received_by uuid references staff(id);
 -- คนเดียวได้รางวัลที่ยังไม่ถูกยกเลิกได้แค่ครั้งเดียว
 create unique index if not exists draw_results_one_win on draw_results(participant_id) where not voided;
 
@@ -367,7 +370,7 @@ declare p participants; prize jsonb;
 begin
   select * into p from participants where token = p_token;
   if p.id is null then return jsonb_build_object('ok', false, 'code', 'NO_PARTICIPANT'); end if;
-  select jsonb_build_object('prize', z.name, 'kind', z.kind, 'rank', z.rank, 'image', z.image, 'description', z.description, 'at', r.drawn_at, 'check', upper(substr(md5(r.id::text || p.token), 1, 6)))
+  select jsonb_build_object('prize', z.name, 'kind', z.kind, 'rank', z.rank, 'image', z.image, 'description', z.description, 'at', r.drawn_at, 'received_at', r.received_at, 'check', upper(substr(md5(r.id::text || p.token), 1, 6)))
     into prize from draw_results r join prizes z on z.id = r.prize_id
    where r.participant_id = p.id and not r.voided limit 1;
   return jsonb_build_object('ok', true, 'participant', _participant_json(p), 'stamps', _stamps_json(p.id),
@@ -494,6 +497,9 @@ begin
   return jsonb_build_object('ok', true, 'participant', _participant_json(p) || jsonb_build_object('phone_masked', _mask_phone(p.phone)),
     'stamps', _stamps_json(p.id),
     'souvenir_by', (select display_name from staff where id = p.souvenir_by),
+    'prize', (select jsonb_build_object('id', r.id, 'name', z.name, 'rank', z.rank, 'kind', z.kind, 'image', z.image, 'drawn_at', r.drawn_at,
+                 'received_at', r.received_at, 'received_by', (select display_name from staff where id = r.received_by))
+                from draw_results r join prizes z on z.id = r.prize_id where r.participant_id = p.id and not r.voided limit 1),
     -- ระดับของที่ระลึกที่ควรได้ ณ ตอนนี้: ครบทุกฐาน = premium, อื่น ๆ = basic
     'tier_now', case when p.completed_at is not null then 'premium' else 'basic' end,
     'tier_name', case when p.completed_at is not null then (select souvenir_premium_name from settings) else (select souvenir_basic_name from settings) end,
@@ -532,6 +538,24 @@ end $$;
 -- ---------------------------------------------------------------------
 -- แอดมิน
 -- ---------------------------------------------------------------------
+-- จุดรับรางวัล: สแกน QR ผู้ชนะแล้วกดยืนยันมอบรางวัล (บันทึกเวลา + เจ้าหน้าที่)
+create or replace function prize_handover(p_token text, p_ref text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare s staff; p participants; r draw_results; z prizes;
+begin
+  s := _staff_from_token(p_token, array['souvenir']);
+  if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
+  select * into p from participants where upper(ref_code) = upper(trim(coalesce(p_ref, '')));
+  if p.id is null then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  select * into r from draw_results where participant_id = p.id and not voided limit 1 for update;
+  if r.id is null then return jsonb_build_object('ok', false, 'code', 'NO_PRIZE'); end if;
+  if r.received_at is not null then return jsonb_build_object('ok', false, 'code', 'PRIZE_RECEIVED', 'received_at', r.received_at); end if;
+  update draw_results set received_at = now(), received_by = s.id where id = r.id;
+  select * into z from prizes where id = r.prize_id;
+  insert into audit_log (staff_id, action, detail) values (s.id, 'prize_handover', jsonb_build_object('ref', p.ref_code, 'result', r.id, 'prize', z.name));
+  return jsonb_build_object('ok', true, 'prize', z.name, 'rank', z.rank, 'name', p.name);
+end $$;
+
 create or replace function admin_stats(p_token text) returns jsonb
 language plpgsql stable security definer set search_path = public as $$
 declare s staff; cfg settings;
@@ -607,7 +631,8 @@ begin
       'company', p.company, 'series', se.name, 'source', p.source, 'registered_at', p.created_at,
       'stamps', (select count(*) from stamps sp where sp.participant_id = p.id),
       'completed_at', p.completed_at, 'souvenir_at', p.souvenir_at, 'souvenir_tier', p.souvenir_tier,
-      'prize', (select z.name from draw_results r join prizes z on z.id = r.prize_id where r.participant_id = p.id and not r.voided limit 1))
+      'prize', (select z.name from draw_results r join prizes z on z.id = r.prize_id where r.participant_id = p.id and not r.voided limit 1),
+      'prize_received_at', (select r.received_at from draw_results r where r.participant_id = p.id and not r.voided limit 1))
       order by p.created_at)
     from participants p join series se on se.code = p.series_code), '[]'::jsonb));
 end $$;
@@ -1112,7 +1137,8 @@ begin
     'id', r.id, 'prize', z.name, 'prize_id', z.id, 'kind', z.kind, 'rank', z.rank, 'ticket_no', p.ticket_no,
     'name', case when s.role = 'admin' then p.name else _mask_name(p.name) end,
     'phone', case when s.role = 'admin' then p.phone else _mask_phone(p.phone) end,
-    'series_name', se.name, 'drawn_at', r.drawn_at, 'voided', r.voided) order by r.id desc)
+    'series_name', se.name, 'drawn_at', r.drawn_at, 'voided', r.voided, 'received_at', r.received_at,
+    'received_by', (select display_name from staff where id = r.received_by)) order by r.id desc)
     from draw_results r join prizes z on z.id = r.prize_id join participants p on p.id = r.participant_id
     join series se on se.code = p.series_code), '[]'::jsonb));
 end $$;
@@ -1142,7 +1168,7 @@ revoke all on all sequences in schema public from anon, authenticated;
 grant execute on function
   event_info(), register_participant(text, boolean, text, text, text, text, boolean), get_passport(text),
   collect_stamp(text, text), staff_login(text, text), staff_me(text), staff_logout(text), station_me(text, int),
-  souvenir_lookup(text, text), souvenir_redeem(text, text),
+  souvenir_lookup(text, text), souvenir_redeem(text, text), prize_handover(text, text),
   admin_stats(text), admin_participants(text, text, text, int, int), admin_export(text),
   admin_import_prereg(text, jsonb, boolean), admin_stations(text), admin_station_save(text, int, text, boolean, boolean),
   admin_settings_save(text, jsonb), admin_staff_list(text), admin_staff_save(text, text, text, text, text, boolean, int), admin_prereg_list(text, text, text, int, int),

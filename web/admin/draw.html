@@ -46,7 +46,7 @@
     </div>
     <section style="display:flex;flex-direction:column;gap:10px">
       <div class="head"><h2>บันทึกผลการจับฉลาก</h2><button class="lbtn" id="expW">Export ผู้ได้รางวัล</button></div>
-      <div class="tablebox"><table><thead><tr><th>รางวัล</th><th>หมายเลข</th><th>ชื่อ</th><th>เบอร์</th><th>ซีรีส์</th><th>เวลา</th><th></th></tr></thead><tbody id="res"></tbody></table></div>
+      <div class="tablebox"><table><thead><tr><th>รางวัล</th><th>หมายเลข</th><th>ชื่อ</th><th>เบอร์</th><th>ซีรีส์</th><th>เวลา</th><th>รับรางวัล</th><th></th></tr></thead><tbody id="res"></tbody></table></div>
       <div class="sub">ผู้ได้รางวัลไม่อยู่ในงาน? กด "ยกเลิกสิทธิ์" · รอบชิงกด "สุ่มแทน" เพื่อสุ่มจากผู้ถือการ์ดใบเดียวกัน · รางวัลทั่วไปสุ่มใหม่บนจอเวที</div>
     </section>
   </main>
@@ -56,7 +56,7 @@
 <script src="/admin/admin.js"></script>
 <script>
 (async function () {
-  const { $, rpc, msg, esc, toast, fmtDateTime, toCSV, download } = K;
+  const { $, rpc, msg, esc, toast, fmtDateTime, fmtTime, toCSV, download } = K;
   const me = await AdminShell('draw', []);
   if (!me) return;
   let results = [];
@@ -133,7 +133,8 @@
   };
   $('#expW').onclick = () => download('kliq-winners.csv', toCSV(results.filter(x => !x.voided), [
     { key: 'prize', label: 'รางวัล' }, { key: 'ticket_no', label: 'หมายเลข' }, { key: 'name', label: 'ชื่อ' }, { key: 'phone', label: 'เบอร์' },
-    { key: 'series_name', label: 'ซีรีส์' }, { get: x => fmtDateTime(x.drawn_at), label: 'เวลา' }]));
+    { key: 'series_name', label: 'ซีรีส์' }, { get: x => fmtDateTime(x.drawn_at), label: 'เวลา' },
+    { get: x => fmtDateTime(x.received_at), label: 'รับรางวัลเมื่อ' }, { key: 'received_by', label: 'มอบโดย' }]));
 
   // ---------- ลำดับการ์ดล่วงหน้า ----------
   const ROLES = [['', 'สุ่ม'], ['out1', 'ใบที่ 1 · OUT'], ['r3', 'ใบที่ 2 · IN รางวัลที่ 3'], ['r2', 'ใบที่ 3 · IN รางวัลที่ 2'], ['out2', 'ใบที่ 4 · OUT'], ['r1', 'ใบที่ 5 · IN รางวัลที่ 1']];
@@ -168,7 +169,8 @@
     if (rs && rs.ok) { results = rs.rows;
       $('#res').innerHTML = rs.rows.map(x => `<tr><td>${x.rank ? 'ที่ ' + x.rank + ' · ' : ''}${esc(x.prize)}</td><td style="letter-spacing:1px">${esc(x.ticket_no)}</td><td>${esc(x.name)}</td><td>${esc(x.phone)}</td>
         <td>${esc(x.series_name)}</td><td class="sub">${fmtDateTime(x.drawn_at)}</td>
-        <td>${x.voided ? '<span class="pill void">ยกเลิกแล้ว</span>' + (x.rank && !rs.rows.some(y => y.prize_id === x.prize_id && !y.voided) ? ` <button class="lbtn" data-replace="${x.rank}" style="min-height:36px">สุ่มแทน</button>` : '') : `<button class="lbtn danger" data-void="${x.id}" style="min-height:36px">ยกเลิกสิทธิ์</button>`}</td></tr>`).join('') || '<tr><td colspan="7" class="sub">ยังไม่มีผลการจับฉลาก</td></tr>'; }
+        <td>${x.voided ? '' : x.received_at ? '<span class="pill done">รับแล้ว ' + fmtTime(x.received_at) + (x.received_by ? ' · ' + esc(x.received_by) : '') + '</span>' : '<span class="pill wait">ยังไม่รับ</span>'}</td>
+        <td>${x.voided ? '<span class="pill void">ยกเลิกแล้ว</span>' + (x.rank && !rs.rows.some(y => y.prize_id === x.prize_id && !y.voided) ? ` <button class="lbtn" data-replace="${x.rank}" style="min-height:36px">สุ่มแทน</button>` : '') : `<button class="lbtn danger" data-void="${x.id}" style="min-height:36px">ยกเลิกสิทธิ์</button>`}</td></tr>`).join('') || '<tr><td colspan="8" class="sub">ยังไม่มีผลการจับฉลาก</td></tr>'; }
   }
   load();
 })();

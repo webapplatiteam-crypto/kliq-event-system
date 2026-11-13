@@ -57,7 +57,10 @@
         ${r.won.image ? `<img src="${r.won.image}" alt="" style="width:140px;height:140px;object-fit:cover;border-radius:18px;background:#fff">` : ''}
         <div class="prize">${r.won.rank ? 'รางวัลที่ ' + r.won.rank + ' · ' : ''}${esc(r.won.prize)}</div>
         ${r.won.description ? `<div class="small" style="color:var(--ink2)">${esc(r.won.description)}</div>` : ''}
-        <div class="small" style="color:var(--ink2)">ขึ้นรับรางวัลที่เวที แสดงหน้านี้และบัตรประชาชนกับเจ้าหน้าที่</div>
+        ${r.won.received_at
+          ? `<div class="pill done" style="font-size:15px;padding:8px 16px">✓ รับรางวัลแล้ว ${fmtTime(r.won.received_at)}</div>`
+          : `<div style="background:#fff;border-radius:16px;padding:12px;margin-top:4px">${qrSvg('KLIQ:' + p.ref_code, 160)}</div>
+             <div class="small" style="color:var(--ink2)">แสดง QR นี้กับเจ้าหน้าที่ที่จุดรับรางวัล พร้อมบัตรประชาชน</div>`}
         <div class="small muted">รหัสตรวจสอบ ${esc(r.won.check)} · ${fmtTime(r.won.at)}</div></section>`;
     } else if (welcome) {
       html += `<div style="display:flex;flex-direction:column;gap:4px"><span style="color:var(--ok);font-size:15px">✓ ลงทะเบียนสำเร็จ</span><h1 style="font-size:24px">คุณได้รับสิทธิ์ลุ้นรางวัลแล้ว</h1></div>`;

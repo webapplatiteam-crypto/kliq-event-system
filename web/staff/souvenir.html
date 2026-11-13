@@ -62,6 +62,13 @@
     $('#stock').textContent = 'มอบแล้ว ' + (r.given_basic + r.given_premium) + ' · พิเศษ ' + r.given_premium + ' · ทั่วไป ' + r.given_basic;
     const prem = r.tier_now === 'premium', tierName = n => n === 'premium' ? r.premium_name : r.basic_name;
     // ป้ายใหญ่บอกทันทีว่าได้ของแบบไหน
+    // ผู้ได้รับรางวัลจากการจับฉลาก → ยืนยันมอบรางวัลที่จุดนี้ได้เลย
+    let prize = '';
+    if (r.prize) prize = r.prize.received_at
+      ? `<div class="tier basic" style="border-color:#9BB07E;background:#EEF3E6"><span class="tl">🏆 ${r.prize.rank ? 'รางวัลที่ ' + r.prize.rank + ' · ' : ''}${esc(r.prize.name)}</span><b>มอบรางวัลแล้ว ${fmtTime(r.prize.received_at)}${r.prize.received_by ? ' โดย ' + esc(r.prize.received_by) : ''}</b></div>`
+      : `<div class="tier prem" style="background:linear-gradient(135deg,#121212,#3A3632);color:#E6C78A;border-color:#C9A063"><span class="tl">🏆 ผู้ได้รับรางวัล · ${r.prize.rank ? 'รางวัลที่ ' + r.prize.rank : 'รางวัล'}</span><b>${esc(r.prize.name)}</b>
+         <span class="tl" style="opacity:.8">ตรวจบัตรประชาชนให้ตรงชื่อ แล้วกดยืนยัน</span></div>
+         <button class="lbtn gold" id="handover" style="min-height:56px;font-size:17px">ยืนยันมอบรางวัล ${esc(r.prize.name)}</button>`;
     let status = `<div class="tier ${prem ? 'prem' : 'basic'}"><span class="tl">${prem ? 'เล่นครบทุกฐาน' : done ? 'เล่นไม่ครบ (' + done + '/' + st.length + ' ฐาน)' : 'ไม่ได้เล่นกิจกรรม'}</span><b>${esc(r.tier_name)}</b></div>`, action = '';
     if (p.souvenir_at && !r.upgrade) status += `<div class="lnotice">รับ${esc(tierName(p.souvenir_tier))}ไปแล้วเมื่อ ${fmtTime(p.souvenir_upgraded_at || p.souvenir_at)}${r.souvenir_by ? ' โดย ' + esc(r.souvenir_by) : ''} · ห้ามมอบซ้ำ</div>`;
     else if (r.upgrade) { status += `<div class="lnotice">รับ${esc(r.basic_name)}ไปแล้วเมื่อ ${fmtTime(p.souvenir_at)} · ตอนนี้เล่นครบทุกฐานแล้ว มอบ${esc(r.premium_name)}เพิ่มได้</div>`;
@@ -71,7 +78,14 @@
       <div style="display:flex;flex-direction:column"><b style="font-size:22px;font-weight:500">${esc(p.name)}</b>
       <span class="sub">${esc(p.ref_code)} · ${esc(p.phone_masked)} · ${esc(p.ticket_no)} (${esc(p.series_name)})</span></div>
       <div class="sbox" role="img" aria-label="ผ่าน ${done} จาก ${st.length} ฐาน">${st.map((s, i) => `<span class="${s.done ? 'on' : ''}" title="${esc(s.name)}">${i + 1}</span>`).join('')}</div>
-      ${status}${action}</div>`;
+      ${prize}${status}${action}</div>`;
+    const h = $('#handover');
+    if (h) h.onclick = async () => {
+      if (!confirm('ยืนยันมอบ "' + r.prize.name + '" ให้ ' + p.name + ' ?')) return;
+      busy(h, true);
+      const x = await rpc('prize_handover', { p_token: me.token, p_ref: p.ref_code });
+      toast(x && x.ok ? 'มอบ ' + x.prize + ' ให้ ' + x.name + ' เรียบร้อย' : msg(x), x && x.ok ? 'ok' : 'err'); lookup(p.ref_code);
+    };
     const g = $('#give');
     if (g) g.onclick = async () => {
       busy(g, true);

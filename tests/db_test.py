@@ -324,6 +324,18 @@ check('final re-closed after replacement', rpc('final_state', MC)['draw']['next_
 wt = sql(f"select token from participants where ticket_no = '{rp['ticket_no']}'", role=None)
 wp = rpc('get_passport', wt)
 check('replacement winner sees iPhone on passport', wp.get('won') and wp['won']['prize'] == 'iPhone 18 Pro Max', wp.get('won'))
+# prize handover at the pickup point (souvenir staff scans winner QR)
+wref = wp['participant']['ref_code']
+lk = rpc('souvenir_lookup', SV, 'KLIQ:' + wref)
+check('pickup lookup shows prize not yet received', lk.get('prize') and lk['prize']['name'] == 'iPhone 18 Pro Max' and lk['prize']['received_at'] is None, lk.get('prize'))
+check('handover: mc cannot', rpc('prize_handover', MC, wref).get('code') == 'AUTH')
+hv = rpc('prize_handover', SV, wref)
+check('handover ok', hv.get('ok') and hv['prize'] == 'iPhone 18 Pro Max', hv)
+check('handover twice blocked', rpc('prize_handover', SV, wref).get('code') == 'PRIZE_RECEIVED')
+check('handover: non-winner', rpc('prize_handover', SV, p1['participant']['ref_code']).get('code') == 'NO_PRIZE')
+check('winner passport shows received', rpc('get_passport', wt)['won']['received_at'] is not None)
+check('results list shows received_by', any(x['received_at'] and x['received_by'] == 'STAFF01' for x in rpc('draw_results_list', A)['rows']))
+check('export has prize_received_at', any(x.get('prize_received_at') for x in rpc('admin_export', A)['rows']))
 # cutoff blocks registration and late registrants not eligible
 rpc('admin_settings_save', A, {'cutoff_at': '2000-01-01T00:00:00Z'})
 check('registration closed after cutoff', rpc('register_participant', '0822222222', True, 'X', None, 'Co', None, True).get('code') == 'CLOSED')

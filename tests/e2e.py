@@ -282,6 +282,17 @@ async def main():
         await wp.goto(BASE + '/passport.html'); await wp.wait_for_selector('.win')
         check('winner sees banner on phone', 'iPhone 18 Pro Max' in await wp.inner_text('.win') and await wp.locator('.win img').count() == 1)
         await shot(wp, '16_passport_winner', True)
+        check('winner passport shows QR for pickup', await wp.locator('.win svg').count() == 1)
+        wref = db("select p.ref_code from draw_results r join participants p on p.id=r.participant_id join prizes z on z.id=r.prize_id where z.kind='final' and z.rank=1 and not r.voided")
+        # pickup point: staff looks up winner -> handover button -> confirmed
+        await w.fill('#q', wref); await w.click('#sf button'); await w.wait_for_selector('#handover')
+        check('pickup point shows winner prize block', 'iPhone 18 Pro Max' in await w.inner_text('#handover'))
+        await shot(w, '16b_staff_prize_handover', True)
+        await w.click('#handover'); await w.wait_for_timeout(1000)
+        check('handover recorded with staff', db(f"select count(*) from draw_results r join participants p on p.id=r.participant_id where p.ref_code='{wref}' and r.received_at is not null and r.received_by is not null") == '1')
+        check('pickup page now shows received', 'มอบรางวัลแล้ว' in await w.inner_text('#result') and await w.locator('#handover').count() == 0)
+        await wp.reload(); await wp.wait_for_selector('.win')
+        check('winner passport shows received badge', 'รับรางวัลแล้ว' in await wp.inner_text('.win') and await wp.locator('.win svg').count() == 0)
 
         # ---------- admin pages
         for name, path, sel in [('21_admin_dashboard', '/admin/index.html', '.kpi'), ('22_admin_participants', '/admin/participants.html', '#rows tr td'),
