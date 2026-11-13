@@ -896,6 +896,43 @@ language sql stable set search_path = public as $$
      and not exists (select 1 from draw_results r where r.participant_id = p.id);
 $$;
 
+-- ลบรางวัล (แอดมิน) — ลบผลจับฉลากของรางวัลนั้นด้วย ใช้เก็บกวาดรางวัลทดสอบ/ตั้งผิด
+create or replace function admin_prize_delete(p_token text, p_id int) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare s staff; z prizes;
+begin
+  s := _staff_from_token(p_token, array[]::text[]);
+  if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
+  select * into z from prizes where id = p_id;
+  if z.id is null then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  if exists (select 1 from draw_results where prize_id = z.id and not voided) then return jsonb_build_object('ok', false, 'code', 'PRIZE_AWARDED'); end if;
+  delete from draw_results where prize_id = z.id;
+  delete from prizes where id = z.id;
+  insert into audit_log (staff_id, action, detail) values (s.id, 'prize_delete', jsonb_build_object('id', z.id, 'name', z.name));
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- ล้างข้อมูลผู้ร่วมงานทั้งหมด (ซ้อม/เริ่มงานใหม่) — แอดมินพิมพ์ยืนยัน RESET · เก็บรายชื่อล่วงหน้า รางวัล ฐาน ทีมงาน การตั้งค่า
+create or replace function admin_reset_event(p_token text, p_confirm text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare s staff; n int;
+begin
+  s := _staff_from_token(p_token, array[]::text[]);
+  if s.id is null or s.role <> 'admin' then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
+  if coalesce(p_confirm, '') <> 'RESET' then return jsonb_build_object('ok', false, 'code', 'BAD_INPUT'); end if;
+  select count(*) into n from participants;
+  delete from draw_results where true;
+  delete from final_draws where true;
+  delete from grand_draws where true;
+  delete from stamps where true;
+  delete from participants where true;
+  perform setval('participant_ref_seq', 1, false);
+  update series set next_no = 1;
+  update settings set cutoff_at = null, registration_open = true, updated_at = now() where id = 1;
+  insert into audit_log (staff_id, action, detail) values (s.id, 'reset_event', jsonb_build_object('participants_removed', n));
+  return jsonb_build_object('ok', true, 'removed', n);
+end $$;
+
 create or replace function draw_eligible_count(p_token text) returns jsonb
 language plpgsql stable security definer set search_path = public as $$
 declare s staff;
@@ -1192,7 +1229,7 @@ grant execute on function
   admin_import_prereg(text, jsonb, boolean), admin_stations(text), admin_station_save(text, int, text, boolean, boolean),
   admin_settings_save(text, jsonb), admin_staff_list(text), admin_staff_save(text, text, text, text, text, boolean, int), admin_prereg_list(text, text, text, int, int),
   admin_participant_update(text, text, text, text, text, text), admin_participant_delete(text, text), admin_prereg_update(text, text, text, text, text, text), admin_prereg_delete(text, text),
-  admin_prizes(text), admin_prize_save(text, int, text, text, int, int, int, text, text),
+  admin_prizes(text), admin_prize_save(text, int, text, text, int, int, int, text, text), admin_prize_delete(text, int), admin_reset_event(text, text),
   draw_eligible_count(text), final_create(text), final_state(text, int), final_next(text, int), final_claim(text, int, boolean), final_replace(text, int),
   draw_prize_next(text, int), draw_results_list(text), draw_void(text, int)
 to anon, authenticated;

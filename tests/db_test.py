@@ -351,6 +351,17 @@ check('registration closed after cutoff', rpc('register_participant', '082222222
 check('nobody eligible when cutoff before all registrations', rpc('draw_eligible_count', MC)['eligible'] == 0)
 rpc('admin_settings_save', A, {'cutoff_at': ''})
 check('cutoff cleared', rpc('draw_eligible_count', MC)['eligible'] == 400 - 8)   # 4 final + 2 normal + no-show + voided
+# prize delete + full reset (admin only, needs RESET)
+tz = rpc('admin_prize_save', A, None, 'ลบทิ้ง', 'normal', 1, 9, None, None, None)
+tzid = max(z['id'] for z in rpc('admin_prizes', A)['rows'])
+check('prize delete: awarded prize blocked', rpc('admin_prize_delete', A, normal).get('code') == 'PRIZE_AWARDED')
+check('prize delete ok', rpc('admin_prize_delete', A, tzid).get('ok') and not any(z['id'] == tzid for z in rpc('admin_prizes', A)['rows']))
+check('reset: needs RESET word', rpc('admin_reset_event', A, 'reset').get('code') == 'BAD_INPUT')
+check('reset: mc cannot', rpc('admin_reset_event', MC, 'RESET').get('code') == 'AUTH')
+rs = rpc('admin_reset_event', A, 'RESET')
+st2 = rpc('admin_stats', A)
+check('reset clears participants/results, keeps prereg + prizes', rs.get('ok') and st2['registered'] == 0 and st2['preregistered_total'] > 0 and len(rpc('admin_prizes', A)['rows']) >= 4 and rpc('draw_results_list', A)['rows'] == [] and rpc('final_state', MC)['draw'] is None, (rs, st2.get('registered')))
+check('reset: numbering restarts', rpc('register_participant', '0800000001', False, None, None, None, None, True)['participant']['ref_code'] == 'PP-0001')
 check('logout', rpc('staff_logout', SV).get('ok') and rpc('staff_me', SV).get('code') == 'AUTH')
 
 print('\nRESULT:', 'ALL PASS' if not fails else f'{len(fails)} FAILED: {fails}')

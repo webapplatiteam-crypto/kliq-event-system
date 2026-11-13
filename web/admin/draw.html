@@ -85,6 +85,7 @@
           <button class="lbtn" data-save>บันทึก</button>
           <button class="lbtn ghost" data-pick>เลือกรูป…</button>
           ${z && z.image ? '<button class="lbtn ghost" data-rmimg>ลบรูป</button>' : ''}
+          ${z && !z.won ? '<button class="lbtn danger" data-del>ลบรางวัล</button>' : ''}
           ${z ? `<span style="font-size:13px;opacity:.8">${z.won >= 1 ? 'มีผู้ได้รับแล้ว' : 'ยังไม่ได้สุ่ม'}</span>` : ''}
         </div>
       </div></div>`;
@@ -113,6 +114,8 @@
     const row = e.target.closest('[data-id]'); if (!row) return;
     if (e.target.matches('[data-pick]') || e.target.matches('.pimg')) { row.querySelector('[data-k="file"]').click(); return; }
     if (e.target.matches('[data-rmimg]')) { row.dataset.img = 'remove'; const b = row.querySelector('.pimg'); b.style.backgroundImage = 'none'; b.innerHTML = 'ลบรูปแล้ว<br>กดบันทึก'; return; }
+    if (e.target.matches('[data-del]')) { if (!confirm('ลบรางวัล "' + row.querySelector('[data-k="name"]').value + '" ?')) return;
+      const r = await rpc('admin_prize_delete', { p_token: me.token, p_id: +row.dataset.id }); toast(r && r.ok ? 'ลบรางวัลแล้ว' : msg(r), r && r.ok ? 'ok' : 'err'); load(); return; }
     if (!e.target.matches('[data-save]')) return;
     const g = k => row.querySelector(`[data-k="${k}"]`).value, im = row.dataset.img;
     const r = await rpc('admin_prize_save', { p_token: me.token, p_id: row.dataset.id ? +row.dataset.id : null, p_name: g('name'), p_kind: g('kind'), p_quantity: +g('quantity'), p_sort: 0, p_rank: g('rank') ? +g('rank') : null,

@@ -36,6 +36,14 @@
         <div class="sub" id="hint"></div>
         <button class="lbtn primary" type="submit">บันทึกการตั้งค่า</button>
       </form>
+      <section class="lcard" style="border-color:#E3B4A0;background:#FFF8F3">
+        <h2 style="color:#9A4A14">ล้างข้อมูลซ้อม / เริ่มงานใหม่</h2>
+        <p class="sub" style="margin:0">ลบผู้ร่วมงานทุกคน การ์ด แสตมป์ และผลจับฉลากทั้งหมด แล้วเริ่มนับเลขใหม่ · <b>เก็บไว้:</b> รายชื่อลงทะเบียนล่วงหน้า รางวัล ฐาน/QR ทีมงาน และการตั้งค่า · ย้อนกลับไม่ได้ ควร Export CSV ก่อน</p>
+        <div class="row" style="align-items:flex-end">
+          <label class="lfield" style="flex:1 1 200px">พิมพ์ <b>RESET</b> เพื่อยืนยัน<input class="linput" id="resetConfirm" autocomplete="off" placeholder="RESET"></label>
+          <button class="lbtn danger" type="button" id="resetBtn" style="min-height:44px">ล้างข้อมูลทั้งหมด</button>
+        </div>
+      </section>
       <section class="lcard">
         <div class="head"><h2>ทีมงานและสิทธิ์</h2></div>
         <div class="tablebox"><table><thead><tr><th>รหัส</th><th>ชื่อ</th><th>บทบาท</th><th>สถานะ</th></tr></thead><tbody id="staff"></tbody></table></div>
@@ -64,7 +72,7 @@
 <script src="/admin/admin.js"></script>
 <script>
 (async function () {
-  const { $, rpc, msg, esc, toast } = K;
+  const { $, rpc, msg, esc, toast, busy } = K;
   const me = await AdminShell('settings', []);
   if (!me) return;
   const ROLE = { admin: 'แอดมิน', souvenir: 'ของที่ระลึก', mc: 'พิธีกร', register: 'ลงทะเบียน', station: 'ประจำฐาน' };
@@ -94,6 +102,16 @@
     const r = await rpc('admin_settings_save', { p_token: me.token, p });
     toast(r && r.ok ? 'บันทึกการตั้งค่าแล้ว' : msg(r), r && r.ok ? 'ok' : 'err'); load();
   };
+  $('#resetBtn').onclick = async () => {
+    const c = $('#resetConfirm').value.trim();
+    if (c !== 'RESET') { toast('พิมพ์ RESET ในช่องยืนยันก่อน', 'err'); return; }
+    if (!confirm('ลบผู้ร่วมงาน การ์ด แสตมป์ และผลจับฉลากทั้งหมด? ย้อนกลับไม่ได้')) return;
+    busy($('#resetBtn'), true, 'กำลังล้าง…');
+    const r = await rpc('admin_reset_event', { p_token: me.token, p_confirm: c });
+    busy($('#resetBtn'), false); $('#resetConfirm').value = '';
+    toast(r && r.ok ? 'ล้างข้อมูลแล้ว ลบผู้ร่วมงาน ' + r.removed + ' คน · ระบบพร้อมเริ่มใหม่' : msg(r), r && r.ok ? 'ok' : 'err');
+  };
+
   $('#tf').onsubmit = async e => {
     e.preventDefault();
     const r = await rpc('admin_staff_save', { p_token: me.token, p_code: $('#t_code').value, p_name: $('#t_name').value, p_role: $('#t_role').value,

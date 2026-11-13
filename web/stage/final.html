@@ -25,6 +25,7 @@
   .scard.in { border-color:var(--gold) }
   .intro { position:fixed; inset:0; z-index:40; background:radial-gradient(ellipse at 50% 0%, #2A2620 0%, #0A0A0A 70%); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.6vh; text-align:center; padding:2.5vh 6vw; overflow:hidden }
   .intro[hidden] { display:none }
+  .stagebtn.pulse { animation:gopulse .9s ease-in-out infinite alternate } @keyframes gopulse { from { box-shadow:0 0 0 rgba(201,160,99,0) } to { box-shadow:0 0 28px rgba(201,160,99,.9) } }
   .intro .ilogo { height:min(9vh, 90px); width:auto; flex:0 0 auto }
   .intro .ihead { font-size:min(4vw, 5.5vh); font-weight:500; line-height:1.15; flex:0 0 auto }
   .intro .isub { font-size:min(1.6vw, 2.4vh); color:var(--ink2); max-width:1100px; flex:0 0 auto }
@@ -191,10 +192,11 @@
     while (true) { els.forEach(e => e.classList.remove('spot')); els[i].classList.add('spot'); tick(); t += d; d = 70 + Math.pow(t / total, 2.2) * 620; if (t >= total && i === ti) break; await sleep(d); i = (i + 1) % els.length; }
     await sleep(500);
   }
-  // ช่วงลุ้น: ไฟหยุดที่การ์ดแล้ว ค้างไว้ให้พิธีกรพูด (ค่าเริ่มต้น 15 วิ) · กด Space หรือ Enter เพื่อเปิดผลก่อนเวลา
-  const HOLD_MS = 15000; let holdResolve = null;
-  function hold(ms) { return new Promise(res => { holdResolve = res; const t = setTimeout(() => { holdResolve = null; res(); }, ms); holdResolve._t = t; }); }
-  function releaseHold() { if (holdResolve) { clearTimeout(holdResolve._t); const r = holdResolve; holdResolve = null; r(); return true; } return false; }
+  // ช่วงลุ้น: ไฟหยุดที่การ์ดแล้ว ค้างไว้ให้พิธีกรพูด "นานเท่าไหร่ก็ได้" — เปิดผลเมื่อพิธีกรกด Space/Enter เท่านั้น (ไม่มีเวลาอัตโนมัติ)
+  const HOLD_MS = 0; let holdResolve = null;
+  function hold() { return new Promise(res => { holdResolve = res; setHold(true); }); }
+  function releaseHold() { if (holdResolve) { const r = holdResolve; holdResolve = null; setHold(false); r(); return true; } return false; }
+  function setHold(on) { const g = $('#go'); if (!g) return; if (on) { g.dataset.label = g.textContent; g.textContent = 'เปิดผล (Space)'; g.classList.add('pulse'); } else if (g.dataset.label) { g.textContent = g.dataset.label; g.classList.remove('pulse'); delete g.dataset.label; } }
   async function eliminate(el) { el.classList.remove('spot'); el.classList.add('flash'); await sleep(120); el.classList.add('shake'); boom(); stamp(el, 'OUT'); await sleep(700); el.classList.remove('shake'); el.classList.add('out'); await sleep(900); }
   async function admit(el, text) { el.classList.remove('spot'); el.classList.add('flash', 'win'); cheer(); stamp(el, text || 'IN', true); confetti(140); await sleep(1500); el.classList.remove('win'); el.classList.add('in'); }
 
