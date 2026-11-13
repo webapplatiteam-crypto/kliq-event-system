@@ -365,7 +365,7 @@ check('reset: numbering restarts', rpc('register_participant', '0800000001', Fal
 # Supabase บล็อก UPDATE/DELETE ที่ไม่มี WHERE — กันพลาดตั้งแต่ตอนเทส
 import re as _re
 _sql = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'supabase', 'schema.sql'), encoding='utf-8').read()
-_bad = [st.strip()[:80] for st in _sql.split(';') if _re.match(r'^\s*(update\s+\w+\s+set\b|delete\s+from\s+\w+)', st.strip(), _re.I) and not _re.search(r'\bwhere\b', st, _re.I)]
+_bad = [st.strip()[:80] for st in _sql.split(';') if _re.match(r'^\s*(update\s+\w+\s+set\b|delete\s+from\s+\w+)', st.strip(), _re.I) and (not _re.search(r'\bwhere\b', st, _re.I) or _re.search(r'\bwhere\s+true\b', st, _re.I))]
 check('schema: no UPDATE/DELETE without WHERE (Supabase rule)', not _bad, _bad)
 check('logout', rpc('staff_logout', SV).get('ok') and rpc('staff_me', SV).get('code') == 'AUTH')
 

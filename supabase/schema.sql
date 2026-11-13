@@ -736,7 +736,7 @@ declare s staff; r jsonb; ph text; ok int := 0; bad jsonb := '[]'::jsonb; ser te
 begin
   s := _staff_from_token(p_token, array[]::text[]);
   if s.id is null then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
-  if p_replace then delete from preregistrations where true; end if;   -- Supabase บล็อก DELETE ที่ไม่มี WHERE
+  if p_replace then delete from preregistrations where phone is not null; end if;   -- Supabase บล็อก DELETE/UPDATE ที่ไม่มี WHERE (และ WHERE true ถูก planner ตัดทิ้ง จึงต้องใช้เงื่อนไขจริง)
   for r in select * from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) loop
     ph := _norm_phone(r->>'phone');
     if ph is null or nullif(trim(r->>'name'), '') is null then
@@ -921,13 +921,13 @@ begin
   if s.id is null or s.role <> 'admin' then return jsonb_build_object('ok', false, 'code', 'AUTH'); end if;
   if coalesce(p_confirm, '') <> 'RESET' then return jsonb_build_object('ok', false, 'code', 'BAD_INPUT'); end if;
   select count(*) into n from participants;
-  delete from draw_results where true;
-  delete from final_draws where true;
-  delete from grand_draws where true;
-  delete from stamps where true;
-  delete from participants where true;
+  delete from draw_results where id is not null;
+  delete from final_draws where id is not null;
+  delete from grand_draws where id is not null;
+  delete from stamps where participant_id is not null;
+  delete from participants where id is not null;
   perform setval('participant_ref_seq', 1, false);
-  update series set next_no = 1 where true;
+  update series set next_no = 1 where code is not null;
   update settings set cutoff_at = null, registration_open = true, updated_at = now() where id = 1;
   insert into audit_log (staff_id, action, detail) values (s.id, 'reset_event', jsonb_build_object('participants_removed', n));
   return jsonb_build_object('ok', true, 'removed', n);
