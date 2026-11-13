@@ -78,7 +78,7 @@
   /* ป๊อปอัปผู้โชคดี */
   .modal { position:fixed; inset:0; background:rgba(5,5,5,.86); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; z-index:40; animation:fadein .4s }
   @keyframes fadein { from { opacity:0 } to { opacity:1 } }
-  .mbox { width:100vw; height:100vh; max-height:100vh; box-sizing:border-box; border-radius:0; padding:2vh 4vw; justify-content:center; gap:1.2vh; text-align:center; background:radial-gradient(ellipse at 50% 0%,#2E2920,#141210); border:1px solid var(--gold); box-shadow:0 0 160px rgba(201,160,99,.45); display:flex; flex-direction:column; align-items:center; gap:1.6vh; animation:popin .55s cubic-bezier(.2,1.3,.4,1) }
+  .mbox { position:relative; width:100vw; height:100vh; max-height:100vh; box-sizing:border-box; border-radius:0; padding:2vh 4vw; justify-content:center; gap:1.2vh; text-align:center; background:radial-gradient(ellipse at 50% 0%,#2E2920,#141210); border:1px solid var(--gold); box-shadow:0 0 160px rgba(201,160,99,.45); display:flex; flex-direction:column; align-items:center; gap:1.6vh; animation:popin .55s cubic-bezier(.2,1.3,.4,1) }
   @keyframes popin { from { transform:scale(.6); opacity:0 } to { transform:scale(1); opacity:1 } }
   .mbox .pz { font-size:min(3.6vw,6.5vh); color:var(--gold); line-height:1.2 } .mbox .pd { font-size:min(1.5vw,2.8vh); color:var(--ink2) }
   /* ป๊อปอัปผู้โชคดี: ซ้าย = รูปรางวัลใหญ่ + ชื่อรางวัล · ขวา = หมายเลข ชื่อ นับถอยหลัง ปุ่ม */
@@ -105,6 +105,21 @@
   #confetti { position:fixed; inset:0; pointer-events:none; z-index:50 }
   #headline.drum { animation:drum .5s ease-in-out infinite alternate; color:var(--gold) }
   @keyframes drum { from { opacity:.6; letter-spacing:0 } to { opacity:1; letter-spacing:2px } }
+  /* หน้าผลลัพธ์ "ยินดีด้วย": แสงรัศมีหมุน + ประกายดาว + ตัวเลขทองวิบวับ · ปุ่มไปต่อย่อลงไว้ล่างสุด */
+  .mbox.won { overflow:hidden; background:radial-gradient(ellipse at 50% 40%,#3B3222 0%,#171410 60%,#0B0A08 100%) }
+  .mbox.won .rays { position:absolute; left:50%; top:50%; width:260vmax; height:260vmax; transform:translate(-50%,-50%); z-index:0; pointer-events:none; opacity:.55;
+    background:repeating-conic-gradient(from 0deg, rgba(201,160,99,0) 0deg 9deg, rgba(201,160,99,.22) 9deg 12deg, rgba(201,160,99,0) 12deg 18deg); animation:rays 60s linear infinite; mask:radial-gradient(circle, #000 0%, rgba(0,0,0,.6) 35%, transparent 62%); -webkit-mask:radial-gradient(circle, #000 0%, rgba(0,0,0,.6) 35%, transparent 62%) }
+  @keyframes rays { to { transform:translate(-50%,-50%) rotate(360deg) } }
+  .mbox.won .mgrid { position:relative; z-index:1 }
+  .mbox.won .mi { animation:miglow 1.6s ease-in-out infinite alternate, popin .6s cubic-bezier(.2,1.3,.4,1) } @keyframes miglow { from { box-shadow:0 0 0 10px rgba(201,160,99,.15), 0 0 60px rgba(201,160,99,.35) } to { box-shadow:0 0 0 14px rgba(201,160,99,.28), 0 0 140px rgba(201,160,99,.75) } }
+  .mbox.won .tk { background:linear-gradient(100deg,#fff 0%,#F7E7C3 30%,#C9A063 50%,#FFF3D6 70%,#fff 100%); background-size:250% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; animation:shine 2.4s linear infinite; filter:drop-shadow(0 0 30px rgba(201,160,99,.45)) }
+  @keyframes shine { from { background-position:200% 0 } to { background-position:-50% 0 } }
+  .mbox.won .wintag { font-size:min(2.6vw,4.6vh); letter-spacing:.35em; color:var(--gold); font-weight:500; animation:popin .7s cubic-bezier(.2,1.3,.4,1) }
+  .mbox.won .nm { animation:popin .8s cubic-bezier(.2,1.3,.4,1) }
+  .spark { position:absolute; width:10px; height:10px; border-radius:50%; background:radial-gradient(circle,#fff 0%,#F2D59A 40%,transparent 70%); pointer-events:none; z-index:2; animation:spark 2.2s ease-in-out infinite; opacity:0 }
+  @keyframes spark { 0% { transform:scale(0); opacity:0 } 40% { transform:scale(1.6); opacity:1 } 100% { transform:scale(0); opacity:0 } }
+  .gonext { position:absolute; left:50%; bottom:2.2vh; transform:translateX(-50%); z-index:3; font-size:min(1vw,1.9vh); color:var(--ink4); letter-spacing:2px; cursor:pointer; opacity:.75; background:none; border:1px solid rgba(255,255,255,.12); border-radius:999px; padding:.6vh 1.6vw; animation:none }
+  .gonext:hover { opacity:1 }
   .whiteout { position:fixed; inset:0; background:#fff; pointer-events:none; z-index:49; animation:whiteout .7s ease-out forwards }
   @keyframes whiteout { 0% { opacity:.95 } 100% { opacity:0 } }
   .snd { position:fixed; right:18px; bottom:18px; width:44px; height:44px; border-radius:22px; border:1px solid var(--goldline); background:rgba(0,0,0,.5); color:var(--gold); font-size:18px; cursor:pointer; z-index:60 }
@@ -201,6 +216,10 @@
     for (const p of parts) { p.vy += .35; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.a += p.va; p.life -= .004;
       cx.save(); cx.translate(p.x, p.y); cx.rotate(p.a); cx.globalAlpha = Math.max(0, p.life); cx.fillStyle = p.c; cx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); cx.restore(); }
     if (!parts.length) { cancelAnimationFrame(raf); raf = 0; } }
+  function sparkle(box) {   // ประกายดาวกระจายรอบจอ
+    for (let i = 0; i < 28; i++) { const d = document.createElement('div'); d.className = 'spark'; d.style.left = (3 + Math.random() * 94) + '%'; d.style.top = (3 + Math.random() * 94) + '%';
+      const sz = 6 + Math.random() * 16; d.style.width = d.style.height = sz + 'px'; d.style.animationDelay = (Math.random() * 2.2) + 's'; d.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; box.appendChild(d); }
+  }
   function whiteout() { const d = document.createElement('div'); d.className = 'whiteout'; document.body.appendChild(d); setTimeout(() => d.remove(), 800); }
   function stamp(el, text, gold) { const d = document.createElement('div'); d.className = 'stamp' + (gold ? ' gold' : ''); d.textContent = text; el.appendChild(d); }
   async function roulette(els, target, total) {              // ไฟวิ่งไล่การ์ด เร็ว → ช้า → หยุดที่เป้า
@@ -348,16 +367,19 @@
     const r = await rpc('final_claim', { p_token: me.token, p_draw_id: draw.id, p_present: present }, { tries: 1 });
     if (!r || !r.ok) { working = false; $('#yes').disabled = $('#no').disabled = false; toast(msg(r), 'err'); return; }
     const box = document.querySelector('.mbox');
-    ['.ring', '.mbtns', '.hint'].forEach(q => { const e = box.querySelector(q); if (e) e.remove(); });
+    ['.ring', '.mbtns', '.hint', '.mright > div[style]'].forEach(q => { const e = box.querySelector(q); if (e) e.remove(); });
     if (present) {
+      box.classList.add('won'); box.insertAdjacentHTML('afterbegin', '<div class="rays"></div>');
       box.querySelector('.eyebrow').textContent = 'CONGRATULATIONS'; box.querySelector('.pz').textContent = `ยินดีด้วย! รับ ${pd.prize || prizeName(pd.rank)}`;
+      const mr = box.querySelector('.mright'); if (mr) mr.insertAdjacentHTML('afterbegin', '<div class="wintag">★ WINNER ★</div>');
+      sparkle(box);
       if (pd.rank === 1) { fanfare(); whiteout(); confetti(420, true); setTimeout(() => confetti(300, true), 700); setTimeout(() => confetti(300, true), 1600); } else { sting(); confetti(220, true); setTimeout(() => confetti(120, true), 500); }
       await sleep(pd.rank === 1 ? 2600 : 1600);
     } else {
       box.querySelector('.eyebrow').textContent = 'NO SHOW'; box.querySelector('.pz').textContent = 'ไม่อยู่ในงาน · ตัดสิทธิ์ แล้วหมุนใหม่'; thud(); await sleep(900);
     }
     // ค้างหน้านี้ไว้จนกว่าพิธีกรจะกด Space (ไม่ไปต่อเอง)
-    const mr = box.querySelector('.mright'); if (mr) mr.insertAdjacentHTML('beforeend', '<div class="gonext stagebtn pulse" style="margin-top:1.5vh">ไปต่อ (Space)</div>');
+    box.insertAdjacentHTML('beforeend', '<div class="gonext">กด Space เพื่อไปต่อ</div>');
     working = false; await new Promise(res => { modalNext = res; });
     closeModal(); draw = r.draw; prizes = r.prizes || prizes; render();
   }
