@@ -69,6 +69,12 @@
   .pin { position:absolute; left:50%; top:-26px; transform:translateX(-50%); width:0; height:0; border-left:22px solid transparent; border-right:22px solid transparent; border-top:52px solid var(--gold); filter:drop-shadow(0 4px 8px rgba(0,0,0,.6)); z-index:3 }
   .pin::after { content:''; position:absolute; left:-12px; top:-50px; width:24px; height:24px; border-radius:50%; background:#F2D59A }
   .hub { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:19%; height:19%; border-radius:50%; background:radial-gradient(circle at 35% 35%,#2A2620,#0E0D0B); border:4px solid var(--gold); display:flex; align-items:center; justify-content:center; color:var(--gold); letter-spacing:4px; font-size:clamp(12px,1.2vw,22px); z-index:2 }
+  /* ตอนหมุน: วงล้อเด้งมาอยู่กลางจอใหญ่ ๆ แล้วค่อย ๆ ช้าลงจนหยุด */
+  .spinstage { position:fixed; inset:0; z-index:35; background:rgba(5,5,5,.78); backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; animation:fadein .35s }
+  .spinstage .wheelbox { width:min(80vh,70vw) !important; height:min(80vh,70vw) !important; margin:0; animation:popin .6s cubic-bezier(.2,1.3,.4,1) }
+  .spinstage .wheelbox canvas { box-shadow:0 0 0 12px #1B1915, 0 0 0 16px var(--gold), 0 0 180px rgba(201,160,99,.5) }
+  .spinstage .pin { top:-34px; border-left-width:28px; border-right-width:28px; border-top-width:64px } .spinstage .pin::after { left:-14px; top:-60px; width:28px; height:28px }
+  .spinstage .sl { position:absolute; bottom:3vh; left:0; right:0; text-align:center; color:var(--gold); font-size:min(2.4vw,4vh); letter-spacing:4px }
   /* ป๊อปอัปผู้โชคดี */
   .modal { position:fixed; inset:0; background:rgba(5,5,5,.86); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; z-index:40; animation:fadein .4s }
   @keyframes fadein { from { opacity:0 } to { opacity:1 } }
@@ -227,21 +233,26 @@
       }
       g.beginPath(); g.arc(R, R, R - 4, 0, Math.PI * 2); g.strokeStyle = '#C9A063'; g.lineWidth = 6; g.stroke();
     },
-    async spin(ticket) {                                      // หมุน ~7 วิ แล้วหยุดที่ช่องของผู้โชคดี (ผลสุ่มมาจากเซิร์ฟเวอร์แล้ว)
+    async spin(ticket, label) {                               // หมุน ~8 วิ แล้วหยุดที่ช่องของผู้โชคดี (ผลสุ่มมาจากเซิร์ฟเวอร์แล้ว)
       this.ensure(ticket); const box = $('#wheelbox'); if (box) box.classList.remove('idle');
+      // เด้งวงล้อมาอยู่กลางจอ (ย้าย element ไปไว้ในฉากกลาง เมื่อ render() ใหม่จะกลับที่เดิมเอง)
+      let stage = null;
+      if (box) { stage = document.createElement('div'); stage.className = 'spinstage'; stage.innerHTML = `<div class="sl">${esc(label || '')}</div>`; document.body.appendChild(stage); stage.appendChild(box); await sleep(650); }
       const n = this.labels.length, seg = 360 / n, idx = this.labels.indexOf(ticket);
       const start = ((this.rot % 360) + 360) % 360;
       const landing = (360 - (idx * seg + seg / 2)) + (Math.random() - .5) * seg * .6;   // มุมที่ทำให้ช่อง idx อยู่ใต้เข็มด้านบน
       const target = 360 * (6 + Math.floor(Math.random() * 2)) + ((landing - start + 360) % 360);
-      const dur = 7000, t0 = performance.now(); let lastSeg = -1; riser(dur * .9);
-      return new Promise(res => { const f = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3.2); this.rot = start + target * e;
+      const dur = 8000, t0 = performance.now(); let lastSeg = -1; riser(dur * .9);
+      await new Promise(res => { const f = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 4); this.rot = start + target * e;   // ยกกำลัง 4 = ช่วงท้ายช้าลงชัดเจน
         this.canvas.style.transform = `rotate(${this.rot}deg)`; const cur = Math.floor((((360 - this.rot % 360) % 360) + 360) % 360 / seg); if (cur !== lastSeg) { lastSeg = cur; tick(); }
         if (k < 1) requestAnimationFrame(f); else setTimeout(res, 400); }; requestAnimationFrame(f); });
+      if (stage) { const sl = stage.querySelector('.sl'); if (sl) sl.textContent = ticket; }
     }
   };
 
   // ---------- เรนเดอร์ ----------
   function render() {
+    clearSpinStage();
     const go = $('#go');
     const p1 = prizeOf(1); if (p1.name) $('#top').textContent = p1.name;
     if (!draw) {
@@ -292,7 +303,7 @@
   }
 
   // ---------- ป๊อปอัปผู้โชคดี + นับถอยหลัง ----------
-  const WHEEL_MS = 7400;   // เวลาหมุนวงล้อ ใช้ชดเชยเมื่อรีเฟรชหน้าแล้วกลับมาที่ป๊อปอัปเดิม
+  const WHEEL_MS = 10500;   // เวลาหมุนวงล้อ ใช้ชดเชยเมื่อรีเฟรชหน้าแล้วกลับมาที่ป๊อปอัปเดิม
   function openModal(pd, fresh) {
     clearInterval(timer);
     const m = $('#modal'); m.hidden = false;
@@ -324,9 +335,10 @@
     $('#yes').onclick = () => claim(true); $('#no').onclick = () => claim(false);
   }
   // ย่อ/ขยายวงล้อให้พอดีกับพื้นที่ที่เหลือ ไม่ให้หน้าเลื่อน
-  function fitWheel() { const w = document.querySelector('.wheelwrap'), b = $('#wheelbox'); if (!w || !b) return; const s = Math.max(240, Math.min(w.clientHeight - 6, innerWidth * .5, innerHeight * .72)); b.style.width = b.style.height = s + 'px'; }
+  function fitWheel() { const w = document.querySelector('.wheelwrap'), b = $('#wheelbox'); if (!w || !b || b.closest('.spinstage')) return; const s = Math.max(240, Math.min(w.clientHeight - 6, innerWidth * .5, innerHeight * .72)); b.style.width = b.style.height = s + 'px'; }
   addEventListener('resize', fitWheel);
   function closeModal() { clearInterval(timer); $('#modal').hidden = true; $('#modal').innerHTML = ''; }
+  function clearSpinStage() { document.querySelectorAll('.spinstage').forEach(e => e.remove()); }
 
   async function claim(present) {
     if (working || !draw || !draw.pending) return;
@@ -402,8 +414,8 @@
     if (next.pending && !prev.pending) {                     // หมุนวงล้อ
       const pd = next.pending, np = next.next_prize || {}; setHead(`${prizeLabel(np)} · ${pd.prize || ''} · วงล้อกำลังหมุน…`, true);
       const lad = document.querySelector(`.lad[data-prize="${pd.prize_id}"] .st`); if (lad) lad.textContent = 'กำลังหมุน…';
-      await Wheel.spin(pd.ticket_no); ding(); shimmer(); confetti(90); justSpun = true;
-      setHead(`${pd.ticket_no} · กรุณาขึ้นเวที`); await sleep(600);
+      await Wheel.spin(pd.ticket_no, `${prizeLabel(np)} · ${pd.prize || ''}`); ding(); shimmer(); confetti(160, true); justSpun = true;
+      setHead(`${pd.ticket_no} · กรุณาขึ้นเวที`); await sleep(1600);   // ค้างให้เห็นช่องที่หยุด แล้วค่อยขึ้นหน้ารางวัล
     }
   }
 
