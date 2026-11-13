@@ -323,7 +323,7 @@
     return `<div class="cards5 ${mini ? 'mini' : ''}">${series.map(s => `<div class="scard ${s.out ? 'out' : ''} ${s.in ? 'in' : ''} ${s.rank ? 'ranked' : ''} ${s.code === cur && !draw.done ? 'pick' : ''}" data-code="${esc(s.code)}" data-pos="${s.pos || ''}" style="background:${esc(s.color)};color:${inkFor(s.code)}">
       ${s.rank ? `<div class="rkb">รางวัลที่ ${s.rank}</div>` : s.in ? `<div class="rkb">IN · เข้ารอบ</div>` : ''}
       ${s.out ? '<div class="stamp still">OUT</div>' : s.in && !s.rank ? '<div class="stamp gold still">IN</div>' : ''}
-      <img src="${seriesImg(s.code, mini ? 'l' : 'p')}" alt="สวิตช์ KLIQ ${esc(s.name)}"><div class="nm">${esc(s.name)}</div><div class="tg tg1">${esc(s.tagline || '')}</div>
+      <img src="${mini ? seriesImg(s.code, 'l') : s.code === 'F' ? '/assets/kliq-forma-stage.webp' : seriesImg(s.code, 'p')}" alt="สวิตช์ KLIQ ${esc(s.name)}"><div class="nm">${esc(s.name)}</div><div class="tg tg1">${esc(s.tagline || '')}</div>
       <div class="tg tg2">${s.out ? 'คัดออกแล้ว' : s.rank ? esc(prizeName(s.rank)) : mini ? (s.holders != null ? s.holders + ' ท่าน' : '') : ''}</div></div>`).join('')}</div>`;
   }
 
