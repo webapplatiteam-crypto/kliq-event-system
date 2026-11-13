@@ -176,8 +176,8 @@ td { padding: 11px 14px; border-top: 1px solid #ECE8E1; vertical-align: middle; 
 
 /* ---------- stage (TV) ---------- */
 body.stage { background: radial-gradient(ellipse at 50% 0%, #2A2620 0%, #0A0A0A 70%); color: var(--ink); min-height: 100vh; overflow: hidden; }
-.stagewrap { height: 100vh; box-sizing: border-box; padding: 3vh 4vw; display: flex; flex-direction: column; gap: 2vh; overflow: hidden; }
-.stage h1 { font-size: clamp(32px, 3.4vw, 64px); }
+.stagewrap { height: 100vh; box-sizing: border-box; padding: 2.5vh 4vw; display: flex; flex-direction: column; gap: 1.6vh; overflow: hidden; }
+.stage h1 { font-size: min(3.4vw, 5.5vh); }
 .finalists { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1.6vw; flex: 1; }
 .fcard { border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 1.2vh; padding-bottom: 3vh; transition: all .5s; border: 2px solid transparent; }
 .fcard img { width: 100%; height: 22vh; object-fit: cover; display: block; transition: filter .5s; }
