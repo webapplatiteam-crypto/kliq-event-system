@@ -25,7 +25,7 @@
       <div><h1>ผู้ร่วมงาน</h1><div class="sub" id="total"></div></div>
       <div class="row adminonly" hidden>
         <button class="lbtn" id="imp">นำเข้ารายชื่อล่วงหน้า (CSV)</button>
-        <button class="lbtn" id="exp">Export CSV</button>
+        <button class="lbtn" id="exp">Export Excel</button>
       </div>
     </div>
 
@@ -76,7 +76,7 @@
 <script src="/admin/admin.js"></script>
 <script>
 (async function () {
-  const { $, $$, rpc, msg, esc, fmtDateTime, fmtTime, toast, busy, toCSV, parseCSV, download } = K;
+  const { $, $$, rpc, msg, esc, fmtDateTime, fmtTime, toast, busy, toXLSX, parseCSV, download } = K;
   const me = await AdminShell('participants', ['register', 'souvenir']);
   if (!me) return;
   if (me.role === 'admin') $$('.adminonly').forEach(e => { if (e.id !== 'impBox') e.hidden = false; });
@@ -173,12 +173,12 @@
     const r = await rpc('admin_export', { p_token: me.token });
     busy($('#exp'), false);
     if (!r || !r.ok) { toast(msg(r), 'err'); return; }
-    download('kliq-participants-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '') + '.csv', toCSV(r.rows, [
+    download('kliq-participants-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '') + '.xlsx', toXLSX(r.rows, [
       { key: 'ref_code', label: 'รหัส' }, { key: 'ticket_no', label: 'หมายเลขลุ้นโชค' }, { key: 'name', label: 'ชื่อ' },
       { key: 'phone', label: 'เบอร์โทร' }, { key: 'email', label: 'อีเมล' }, { key: 'company', label: 'บริษัท' },
-      { key: 'series', label: 'ซีรีส์' }, { key: 'source', label: 'ประเภท' }, { get: x => fmtDateTime(x.registered_at), label: 'ลงทะเบียน' },
+      { key: 'series', label: 'ซีรีส์' }, { get: x => x.source === 'pre' ? 'ลงทะเบียนล่วงหน้า' : 'Walk-in', label: 'ประเภท' }, { get: x => fmtDateTime(x.registered_at), label: 'ลงทะเบียน' },
       { key: 'stamps', label: 'จำนวนฐาน' }, { get: x => fmtDateTime(x.completed_at), label: 'ครบทุกฐาน' },
-      { get: x => fmtDateTime(x.souvenir_at), label: 'รับของที่ระลึก' }, { get: x => x.souvenir_tier === 'premium' ? 'พิเศษ' : x.souvenir_tier === 'basic' ? 'ทั่วไป' : '', label: 'แบบของที่ระลึก' }, { key: 'prize', label: 'รางวัล' }]));
+      { get: x => fmtDateTime(x.souvenir_at), label: 'รับของที่ระลึก' }, { get: x => x.souvenir_tier === 'premium' ? 'พิเศษ' : x.souvenir_tier === 'basic' ? 'ทั่วไป' : '', label: 'แบบของที่ระลึก' }, { key: 'prize', label: 'รางวัล' }, { get: x => fmtDateTime(x.prize_received_at), label: 'รับรางวัลเมื่อ' }], 'ผู้ร่วมงาน'));
   };
   $('#imp').onclick = () => { $('#impBox').hidden = !$('#impBox').hidden; };
   $('#tpl').onclick = () => download('kliq-prereg-template.csv', '﻿phone,name,email,company\r\n0812345678,สมชาย ใจดี,somchai@email.com,บริษัท ตัวอย่าง จำกัด\r\n');

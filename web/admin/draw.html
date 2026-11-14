@@ -45,7 +45,7 @@
       </section>
     </div>
     <section style="display:flex;flex-direction:column;gap:10px">
-      <div class="head"><h2>บันทึกผลการจับฉลาก</h2><button class="lbtn danger" id="resetDraw" title="ลบผลจับฉลากและรอบชิงทั้งหมด เก็บผู้ร่วมงานไว้">รีเซ็ตลักกี้ดรอว์</button> <button class="lbtn" id="expW">Export ผู้ได้รางวัล</button></div>
+      <div class="head"><h2>บันทึกผลการจับฉลาก</h2><button class="lbtn danger" id="resetDraw" title="ลบผลจับฉลากและรอบชิงทั้งหมด เก็บผู้ร่วมงานไว้">รีเซ็ตลักกี้ดรอว์</button> <button class="lbtn" id="expW">Export Excel ผู้ได้รางวัล</button></div>
       <div class="tablebox"><table><thead><tr><th>รางวัล</th><th>หมายเลข</th><th>ชื่อ</th><th>เบอร์</th><th>ซีรีส์</th><th>เวลา</th><th>รับรางวัล</th><th></th></tr></thead><tbody id="res"></tbody></table></div>
       <div class="sub">ผู้ได้รางวัลไม่อยู่ในงาน? กด "ยกเลิกสิทธิ์" · รอบชิงกด "สุ่มแทน" เพื่อสุ่มจากผู้ถือการ์ดใบเดียวกัน · รางวัลทั่วไปสุ่มใหม่บนจอเวที</div>
     </section>
@@ -56,7 +56,7 @@
 <script src="/admin/admin.js"></script>
 <script>
 (async function () {
-  const { $, rpc, msg, esc, toast, fmtDateTime, fmtTime, toCSV, download } = K;
+  const { $, rpc, msg, esc, toast, fmtDateTime, fmtTime, toXLSX, download } = K;
   const me = await AdminShell('draw', []);
   if (!me) return;
   let results = [];
@@ -140,10 +140,10 @@
     const r = await rpc('admin_reset_draw', { p_token: me.token, p_confirm: c.trim() });
     toast(r && r.ok ? 'รีเซ็ตลักกี้ดรอว์แล้ว (ลบผล ' + r.removed + ' รายการ) เริ่มรอบใหม่บนจอเวทีได้' : r && r.code === 'BAD_INPUT' ? 'ต้องพิมพ์ RESET' : msg(r), r && r.ok ? 'ok' : 'err'); load();
   };
-  $('#expW').onclick = () => download('kliq-winners.csv', toCSV(results.filter(x => !x.voided), [
+  $('#expW').onclick = () => download('kliq-winners.xlsx', toXLSX(results.filter(x => !x.voided), [
     { key: 'prize', label: 'รางวัล' }, { key: 'ticket_no', label: 'หมายเลข' }, { key: 'name', label: 'ชื่อ' }, { key: 'phone', label: 'เบอร์' },
     { key: 'series_name', label: 'ซีรีส์' }, { get: x => fmtDateTime(x.drawn_at), label: 'เวลา' },
-    { get: x => fmtDateTime(x.received_at), label: 'รับรางวัลเมื่อ' }, { key: 'received_by', label: 'มอบโดย' }]));
+    { get: x => fmtDateTime(x.received_at), label: 'รับรางวัลเมื่อ' }, { key: 'received_by', label: 'มอบโดย' }], 'ผู้ได้รางวัล'));
 
   // ---------- ลำดับการ์ดล่วงหน้า ----------
   const ROLES = [['', 'สุ่ม'], ['out1', 'ใบที่ 1 · OUT'], ['r3', 'ใบที่ 2 · IN รางวัลที่ 3'], ['r2', 'ใบที่ 3 · IN รางวัลที่ 2'], ['out2', 'ใบที่ 4 · OUT'], ['r1', 'ใบที่ 5 · IN รางวัลที่ 1']];

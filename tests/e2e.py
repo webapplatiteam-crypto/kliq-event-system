@@ -328,8 +328,9 @@ async def main():
         await a.fill('#q', ''); await a.wait_for_timeout(600)
         async with a.expect_download() as dl:
             await a.click('#exp')
-        d = await dl.value; path = await d.path(); content = open(path, encoding='utf-8-sig').read()
-        check('export CSV has header + 27 rows', len(content.strip().splitlines()) == 28, len(content.strip().splitlines()))
+        d = await dl.value; path = await d.path()
+        import openpyxl, shutil; xp = os.path.join(SHOTS, 'export.xlsx'); shutil.copy(path, xp); wb = openpyxl.load_workbook(xp); ws = wb.active
+        check('export is a real Excel workbook: header + 27 rows, Thai header, phone kept as text', d.suggested_filename.endswith('.xlsx') and ws.max_row == 28 and ws['A1'].value == 'รหัส' and ws['D2'].value and str(ws['D2'].value).startswith('0'), (d.suggested_filename, ws.max_row, ws['A1'].value, ws['D2'].value))
         await a.goto(BASE + '/admin/draw.html'); await a.wait_for_selector('[data-void]')
         rid = db("select r.id from draw_results r join prizes z on z.id = r.prize_id where z.kind = 'final' and z.rank = 1")
         await a.click(f'[data-void="{rid}"]'); await a.wait_for_selector('[data-replace="1"]')
